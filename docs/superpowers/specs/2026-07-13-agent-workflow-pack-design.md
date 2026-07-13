@@ -46,16 +46,21 @@ Each state dimension has one scoped authority.
 | Authority | Sole responsibility |
 |---|---|
 | `profiles/*.yaml` | Activation intent, route-admission policy selection, workflow ownership selection, platform defaults, and required capability levels |
+| `release/trust-policy.yaml` | Allowed GitHub host and exact owner/repository, immutable-release requirement, release-tag derivation, manifest asset name, and redirect-host policy |
+| Detached immutable-release `release-manifest.json` | Distribution asset URLs, byte sizes and SHA-256 hashes, source commit, Release Identity, and the exact trust-policy, workflow, artifact, schema, migration, compatibility, and launcher bundle digests for one published release |
 | Release `workflow.lock` | Default locked workflow supply chain shipped with one CLI release |
 | Target `.agent-workflow/workflow.lock` | Project-scoped workflow supply-chain identity used by `sync` |
-| `compatibility/releases.yaml` | Explicitly supported release-transition edges and the schema, artifact, and task-contract migrations required by each edge |
+| `compatibility/releases.yaml` | Explicitly supported release-transition edges, target Release Identity and bundle identities, and the schema, artifact, and task-contract migrations required by each edge; never distribution-container hashes |
 | `artifact-definitions/*.yaml` | Manageable target paths, ownership class, merge strategy, stable markers, validators, and additional forbidden paths |
 | Global protected-path policy | Paths no artifact definition may target or relax |
 | `.agent-workflow/manifest.json` | What was actually materialized, the applied baselines and hashes, selected profile, digests, generation, and last committed transaction |
 | `.agent-workflow/local/workspace.json` | Non-Git identity of the current working copy, bound to the repository-lineage ID |
+| `.agent-workflow/local/approval-replay.json` | Workspace-local reservation and consumption state for one-time task-admission approval proofs |
 | `.trellis/tasks/<task>/integration.yaml` | Pinned mode, workflow contract, and lifecycle of one admitted integrated task; the mode-specific branch is also authoritative for heavy-router phase, owners, artifacts, and executor claim when applicable |
 
 A profile may select a versioned artifact policy, but it cannot expand the paths authorized by artifact definitions. A manifest records prior application state but cannot authorize a future write that current definitions prohibit.
+
+Task transaction journals are recovery evidence, and `.agent-workflow/local/task-outbox/**` is a non-authoritative delivery queue. Neither may independently change task lifecycle, approval-consumption state, routing, ownership, or acceptance; those outcomes must already be committed in the authority named above.
 
 ## 5. Planned Repository Structure
 
@@ -64,6 +69,8 @@ agent-workflow-pack/
 ├── pyproject.toml
 ├── uv.lock
 ├── workflow.lock
+├── release/
+│   └── trust-policy.yaml
 ├── compatibility/
 │   └── releases.yaml
 ├── profiles/
@@ -107,7 +114,9 @@ agent-workflow-pack/
 
 The v0.1 release wheel is self-contained at runtime: required pure-Python third-party runtime code is vendored under a private package namespace from hash-locked source artifacts, and the published wheel declares no external runtime `Requires-Dist` dependencies. Vendored code participates in package digests, provenance, full-license inclusion, modification notices, and vulnerability review. A required dependency that cannot be safely vendored as pure Python blocks release and requires a new design decision rather than silently adding an external runtime resolution.
 
-`schemas/` contains versioned schemas for profiles, catalogs, workflow locks, release compatibility, runtime-control descriptors, artifact definitions, manifests, transactions, saved reconcile plans, provider-execution plans and approvals, Desired State IR, route decisions, integration state, diagnostics, capability manifests, and provenance records.
+`schemas/` contains versioned schemas for profiles, catalogs, workflow locks, release identity and detached manifests, release compatibility, runtime-control descriptors, artifact definitions, manifests, transactions, saved reconcile plans, provider-execution plans and approvals, Desired State IR, route decisions, integration state, diagnostics, capability manifests, and provenance records.
+
+`release-manifest.json` is a release-CI output published beside the wheel and sdist; it is deliberately absent from the wheel, sdist, and source tree. Only its schema and the trust policy are packaged.
 
 The supported Python range for v0.1 is `>=3.11,<3.15`. Release is blocked unless Python 3.11, 3.12, 3.13, and 3.14 each pass build, unit, integration, and packaging tests; narrowing the range requires an explicit spec and release-metadata change.
 
@@ -162,7 +171,7 @@ Adapters project resolved policy into the native files, hooks, agents, commands,
 
 ### 6.8 Runtime Launcher
 
-The Runtime Launcher is a managed, on-demand bootstrap path for the Task-state Service, route issuer, diagnostics, recovery, and workspace registration. It is not a daemon and retains no independent policy. It selects only the exact runtime identity authorized by the committed Manifest or an unfinished transaction journal, then the selected CLI independently revalidates those authorities before executing a command.
+The Runtime Launcher is a managed, on-demand bootstrap path for the Task-state Service, canonical route calculator, diagnostics, recovery, and workspace registration. It is not a daemon and retains no independent policy. It selects only the exact runtime identity authorized by the committed Manifest or a verified candidate allowlist, then the selected CLI independently revalidates those authorities before executing a command.
 
 ## 7. Profile Contract
 
@@ -199,6 +208,10 @@ required_capabilities:
   task_admission_gate: enforced
   task_archive_gate: enforced
   project_skills: instruction-only
+approval_policy:
+  direct_human_actor_required: true
+  max_ttl_seconds: 900
+  max_clock_skew_seconds: 60
 provider_security_policy:
   temporary_home_xdg: required
   environment_allowlist: required
@@ -248,7 +261,59 @@ Catalog entries use stable IDs and describe:
 
 The release `workflow.lock` is committed and packaged with the CLI. `init` computes the exact transitive component closure required by the resolved profile and deterministically projects those unchanged locked identities and hashes into `.agent-workflow/workflow.lock`. It performs no version re-resolution and never queries a latest version.
 
-`sync` consumes only the existing project lock and cannot modify it. `upgrade` creates a candidate lock, fetches and verifies its content, generates a candidate IR, and presents supply-chain, routing, and file differences before approval. A release transition is legal only when the running release's compatibility metadata contains an exact directed edge from the current installed release to the requested target and identifies every required schema, artifact, and task-contract migration.
+Every distribution form computes the same non-self-referential Release Identity:
+
+```text
+release_id = SHA256(JCS({
+  repository_id,
+  distribution,
+  version
+}))
+```
+
+`repository_id` is the normalized host/owner/repository fixed by the trust policy. The Release Identity contains no source commit, wheel, sdist, archive, detached-manifest, bundle digest, URL, or byte-size field. This intentionally allows the ID to be committed inside compatibility metadata without depending on the Git commit or any bytes that contain the ID. A Git checkout, wheel, and sdist compute it from the same repository identity, distribution name, and version. The detached manifest then binds that logical release to the exact source commit, bundle roots, and distribution-container hashes; publishing a second artifact set for the same version is forbidden by the immutable-release policy.
+
+The detached manifest has at least:
+
+```yaml
+schema_version: 1
+release_id: sha256-release-identity
+version: 0.1.1
+repository:
+  host: github.com
+  owner: pinned-owner
+  name: agent-workflow-pack
+  tag: v0.1.1
+  immutable_release_required: true
+source_commit: full-40-hex-commit
+bundles:
+  trust_policy: sha256-value
+  workflow_lock: sha256-value
+  artifact: sha256-value
+  schema: sha256-value
+  migration: sha256-value
+  compatibility: sha256-value
+  launcher: sha256-value
+assets:
+  wheel:
+    name: agent_workflow_pack-0.1.1-py3-none-any.whl
+    url: immutable-release-asset-url
+    size: 123456
+    sha256: sha256-value
+  sdist:
+    name: agent_workflow_pack-0.1.1.tar.gz
+    url: immutable-release-asset-url
+    size: 123456
+    sha256: sha256-value
+```
+
+The v0.1 trust root is `github-immutable-release-v1`: the trusted current CLI derives the manifest location from `release/trust-policy.yaml`, uses HTTPS and the GitHub release API, verifies the exact host/owner/repository/tag, requires the release to be immutable, restricts redirect hosts, and retrieves the fixed manifest asset by the policy-defined name. Neither a target project nor a transaction may supply or override that URL. The fetched manifest byte digest is computed externally and recorded for later offline use; the digest is not stored inside the manifest itself.
+
+v0.1 does not support trust-root rotation through an ordinary upgrade. Every candidate must reverify under the currently committed trust-policy bytes and retain both the same policy ID and content digest. Repository transfer, host change, policy-content change, or a future signing/attestation policy requires a separately designed transition authorized by the old trust root.
+
+Bundle digest domains are schema-defined and non-overlapping. They exclude distribution containers and the detached manifest. The compatibility bundle may name logical Release Identities but cannot contain its own digest or a source-commit field for the release that contains it. The launcher bundle covers release-neutral templates, schemas, and verifier logic; it excludes the rendered project descriptor and launcher substitutions derived from the detached manifest. Release CI rejects any bundle reference graph with a digest cycle.
+
+`sync` consumes only the existing project lock and cannot modify it. `upgrade` creates a candidate lock, fetches and verifies its content, generates a candidate IR, and presents supply-chain, routing, and file differences before approval. A release transition is legal only when the runtime that owns the migration for that direction contains an exact directed edge from the current installed release to the requested target and identifies every required schema, artifact, and task-contract migration. A verified candidate release owns an installed-to-candidate forward edge; the currently installed newer release owns any supported edge to an earlier target. An immutable source release is never required to predict a future release's bundle identities.
 
 ```yaml
 schema_version: 1
@@ -257,14 +322,14 @@ transitions:
   - from: 0.1.0
     to: 0.1.1
     target_release:
+      release_id: sha256-release-identity
       version: 0.1.1
-      wheel_url: immutable-https-wheel-url
-      wheel_sha256: sha256-value
-      source_commit: full-40-hex-commit
+      trust_policy_digest: sha256-value
       workflow_lock_digest: sha256-value
       artifact_bundle_digest: sha256-value
       schema_bundle_digest: sha256-value
       migration_bundle_digest: sha256-value
+      launcher_bundle_digest: sha256-value
     manifest_schemas: {from: 1, to: 1}
     workflow_lock_schemas: {from: 1, to: 1}
     integration_schemas: {from: 1, to: 1}
@@ -272,9 +337,9 @@ transitions:
     migration_digest: sha256-value
 ```
 
-Edges are directed; reverse support requires its own entry. Each edge shipped by the running immutable release binds the complete target release asset and the expected workflow-lock, artifact, schema, and migration bundles; `target_release.version` must equal `to`. An edge never implies compatibility with an unlisted patch, minor, or historical version.
+Edges are directed; reverse support requires its own entry. Each edge binds the target logical Release Identity and expected trust-policy, workflow-lock, artifact, schema, migration, and launcher bundles, but never a source commit, its own compatibility-bundle digest, or a distribution-container URL or hash; `target_release.version` must equal `to`. The detached manifest independently binds the source commit and the digest of the compatibility bundle containing the edge. An edge never implies compatibility with an unlisted patch, minor, or historical version.
 
-The default `upgrade` target is the release of the exact CLI currently executing the command. A different `--to` target is legal only when the running release contains the complete directed edge above. The CLI may read its own trusted edge before acquisition, but it must verify the target wheel's complete byte hash before importing code or parsing any lock, schema, migration, or artifact metadata from that asset. Every parsed target bundle must then match the digest bound by the edge or the transition stops before project writes.
+The default `upgrade` target is the release of the exact CLI currently executing the command. For a forward upgrade launched from an older project runtime, `--to` is only a trust-policy-bound candidate locator: the committed runtime verifies the target detached manifest, downloads the exact wheel named there, checks its full byte hash and size, and only then reads static identity and compatibility metadata from the verified archive. The candidate must contain the complete installed-to-candidate edge and describe itself as `target_release`; its internal Release Identity and every parsed bundle must match both the detached manifest and that edge before candidate code executes. For a supported transition to an earlier release, the currently executing newer runtime must contain the complete edge and performs the migration without executing the older CLI against newer state.
 
 ```text
 current lock
@@ -288,7 +353,7 @@ current lock
   -> Reconcile lock + artifacts + manifest
 ```
 
-All network requests require a trusted lock source. In an initialized project, the manifest and project-lock digests must agree before any request. In a migration project without a valid manifest, a project-supplied lock is never trusted for downloads; only the lock embedded in the cryptographically anchored CLI release may authorize acquisition.
+Workflow-component network requests require a trusted lock source. In an initialized project, the manifest and project-lock digests must agree before such a request. Release-asset requests instead require the packaged release trust policy and a verified detached release manifest. In a migration project without a valid manifest, project-supplied locks, manifests, journals, and URLs are never trusted for downloads; only the current immutable CLI release and its packaged trust policy may authorize acquisition.
 
 ## 9. Artifact Definitions and Protected Paths
 
@@ -326,6 +391,17 @@ protected_paths:
 ```
 
 Artifact definitions may add restrictions but cannot relax global protection. Internal control-plane code retains explicit authority over `.agent-workflow/manifest.json`, `.agent-workflow/workflow.lock`, `.agent-workflow/reconcile.lock`, `.agent-workflow/runtime-state.lock`, `.agent-workflow/maintenance.json`, `.agent-workflow/local/**`, `.agent-workflow/task-transactions/**`, and `.agent-workflow/transactions/**`; ordinary artifact definitions may not target those files. Only the Task-state Service may use the local task locks, task staging, task-transaction journals, or integration state.
+
+The locked Trellis adapter declares its task layout instead of relying on an upstream path assumption:
+
+```yaml
+trellis_task_layout:
+  active_root: .trellis/tasks
+  archive_root: .trellis/tasks/archive
+  metadata_paths: []
+```
+
+`metadata_paths` is populated with every index, pointer, or journal file participating in admission/archive; it may be empty only when adapter tests prove that the locked Trellis version has no such metadata. The Resolver normalizes these real non-symlink roots and paths, requires the archive root to be explicitly partitioned from active-task enumeration even when nested, derives protected globs for both roots, and includes the layout in the adapter and artifact-bundle digests. A new task ref must be below `active_root` but outside `archive_root`. An adapter root or metadata-path change is contract-changing and cannot silently weaken the global protected-path policy.
 
 The generated ignore overlay excludes `.agent-workflow/local/`, `.agent-workflow/task-transactions/`, `.agent-workflow/transactions/`, both OS lock files, maintenance state, backups, and temporary files from Git. The Manifest, project workflow lock, and managed runtime catalog remain project-scoped files that may be committed. `doctor` blocks writes when ephemeral control state is tracked or when required project-scoped authority files are unexpectedly ignored.
 
@@ -390,6 +466,10 @@ The target manifest is stored at `.agent-workflow/manifest.json`.
   "project_id": "stable-project-uuid",
   "generation": 7,
   "pack_version": "0.1.0",
+  "release_id": "sha256-release-identity",
+  "release_manifest_digest": "sha256-value",
+  "release_trust_policy_id": "github-immutable-release-v1",
+  "release_trust_policy_digest": "sha256-value",
   "profile": "sol56-sdd",
   "profile_digest": "sha256-value",
   "lock_digest": "sha256-value",
@@ -469,7 +549,7 @@ User-owned content may be read or validated but is never modified by the Reconci
 
 ### 14.1 `bootstrap`
 
-When a valid manifest exists and its digest matches the project lock, `bootstrap` fetches and verifies that project lock. Otherwise it uses only the immutable CLI release lock and ignores any untrusted project-local lock. It writes only the user cache and is an optional acceleration command.
+When a valid Manifest exists and `Manifest.lock_digest == SHA256(canonical project workflow.lock)`, `bootstrap` fetches and verifies that project lock. Otherwise it uses only the workflow lock bound by the current verified Release Identity and ignores any untrusted project-local lock. It writes only the user cache and is an optional acceleration command.
 
 ### 14.2 `init`
 
@@ -481,7 +561,7 @@ Existing Trellis, Spec Kit, or platform files are compared with staged initializ
 
 ### 14.3 `sync`
 
-Uses the existing project profile identity, project lock, artifact bundle identity, schema versions, renderer versions, and manifest `pack_version`. It may reconcile only when those inputs match the running pack release and the result passes active-task gates. A normal `sync` never modifies the project lock; a pack-version or contract mismatch requires `upgrade`.
+Uses the existing project Release Identity, profile identity, project lock, artifact bundle identity, schema versions, renderer versions, and Manifest `pack_version`. It may reconcile only when those inputs match the running verified release and the result passes active-task gates. A normal `sync` never modifies the project lock; a release, pack-version, or contract mismatch requires `upgrade`.
 
 A `sync` may bypass the active-task gate only when the reconcile plan is a true no-op. Creating, deleting, repairing, or modifying any runtime-visible file requires the gate.
 
@@ -517,11 +597,21 @@ Acquires the same bootstrap/project Reconciler locks required by the interrupted
 
 ### 14.9 `route decide`
 
-The project launcher dispatches `agent-stack route decide --platform <id> --operation create-task --task-ref <ref> --intent <file> --signals <stable-id,...>`, the sole issuer of executable task-creation Route Decisions. A model or user may propose the task ref, Task Intent, candidate signal IDs, and explanatory reasons, but cannot supply authority digests, matched rules, route, entry owner, decision identity, challenge, or approval state. The command validates and normalizes those proposals, takes a shared runtime-state gate lock for a consistent task snapshot, reads current project and task authorities, applies the compiled admission policy, and emits the decision without creating the task path. An implementation may use the exclusive gate when portable shared locking is unavailable. `operation: classify-only` remains available when no task creation is requested. The command does not interpret natural language or mutate task state.
+`agent-stack route decide` is the canonical calculator for unsigned Route Decisions. It accepts exactly one requested operation:
+
+```text
+classify-only
+execute-light --intent <file>
+create-integrated-task --task-ref <ref> --intent <file>
+```
+
+A model or user proposes candidate stable signal IDs, explanatory reasons, and the branch-specific intent or task ref. CLI flags cannot supply authority digests, matched rules, calculated route, entry owner, decision identity, challenge, or approval state. The command validates and normalizes inputs, takes a shared runtime-state gate lock for a consistent task snapshot, reads current authorities, and applies the compiled admission policy. An implementation may use the exclusive gate when portable shared locking is unavailable. It does not interpret natural language or mutate task state.
+
+The calculated route must be legal for the requested operation. A mismatch returns `AWP_ROUTE_OPERATION_MISMATCH` and no executable Decision. In particular, `execute-light` cannot receive an integrated route, and `create-integrated-task` cannot receive `native-light`.
 
 ### 14.10 `task admit|claim|transition|release|archive|recover`
 
-These commands are the only supported mutation interface for integrated task lifecycle. `admit` consumes a task-bound Route Decision and one-time user-approval proof, then creates the task shell and revision 1 together through the task-admission transaction in Section 21. `claim`, `transition`, and `release` require the expected revision plus command-specific preconditions. `archive` coordinates the locked Trellis archive adapter and integration lifecycle in one recoverable task transaction. `task recover --transaction <id> --resume|--rollback` may resume any validated unfinished task transaction, but rollback is legal only before that operation's commit point; after commit it may finish forward completion or cleanup and may not erase the committed task or archive. Platform wrappers must not expose direct Trellis create/archive, direct integration writes, or non-interactive approval bypasses.
+These commands are the only supported mutation interface for integrated task lifecycle. `admit` consumes only an `operation: create-integrated-task` Decision and its one-time user-approval proof, then creates the task shell and revision 1 together through the task-admission transaction in Section 21. `classify-only` and `execute-light` are invalid inputs. `claim`, `transition`, and `release` require the expected revision plus command-specific preconditions. `archive` coordinates the locked Trellis archive adapter and integration lifecycle in one recoverable task transaction. `task recover --transaction <id> --resume|--rollback` may resume any validated unfinished task transaction, but rollback is legal only before that operation's commit point; after commit it may finish forward completion or cleanup and may not erase the committed task or archive. Platform wrappers must not expose direct Trellis create/archive, direct integration writes, or non-interactive approval bypasses.
 
 ### 14.11 `workspace register`
 
@@ -538,6 +628,12 @@ project_id: stable-project-uuid
 workspace_instance_id: clone-local-uuid
 manifest_generation: 6
 manifest_digest: sha256-value
+installed_release_id: sha256-release-identity
+installed_release_manifest_digest: sha256-value
+candidate_release_id: sha256-release-identity
+candidate_release_manifest_digest: sha256-value
+release_trust_policy_id: github-immutable-release-v1
+release_trust_policy_digest: sha256-value
 profile_digest: sha256-value
 lock_digest: sha256-value
 artifact_bundle_digest: sha256-value
@@ -546,12 +642,15 @@ preconditions: []
 candidate_file_states: []
 ```
 
+For non-upgrade plans, candidate release fields equal the installed release fields. An upgrade plan may name only the Release Identity and detached-manifest digest already verified from the trust-policy-derived immutable release; it cannot carry a release URL, redefine asset hashes, or change the trust-policy ID or digest.
+
 Each precondition and candidate file-state object binds one repository-relative path to existence, regular-file type, byte hash, normalized POSIX mode, and non-symlink status; overlay entries additionally bind marker and managed-block hashes. The plan never relies on parallel path, hash, and mode arrays.
 
 Applying a saved plan revalidates:
 
 - repository-lineage and workspace-instance identities;
 - manifest generation and digest;
+- installed and candidate Release Identities, detached-manifest digests, trust policy, and verified compatibility edge;
 - pack and schema versions;
 - prospective transaction identity and any bound provider-execution approvals;
 - every path precondition, byte hash, POSIX mode, file type, and non-symlink status;
@@ -634,11 +733,11 @@ While maintenance exists:
 - write-type runtime commands are blocked;
 - only read-only diagnostics and `recover` are allowed.
 
-The route decision is:
+Route calculation emits no Decision while maintenance is active. It returns this non-executable diagnostic:
 
 ```yaml
 schema_version: 1
-route: blocked
+status: blocked
 blocked_by: maintenance
 transaction_id: transaction-uuid
 ```
@@ -647,7 +746,7 @@ After maintenance clears, an existing task resumes its pinned mode and contract 
 
 Activity checks cover every non-archived integration state reachable from the locked Trellis active and archive roots, plus every unfinished task transaction; they do not rely only on the current session pointer:
 
-- `active`, `blocked`, `completed`, and `archiving` all remain gating states; only `archived` is non-gating.
+- `admitting`, `active`, `blocked`, `completed`, and `archiving` all remain gating states; only `archived` is non-gating.
 - Any unfinished `speckit-superpowers` task blocks a contract-changing upgrade.
 - A Trellis-native task blocks a candidate that changes Trellis, route admission, adapters, hooks, agents, or related skills.
 - Any unfinished task-admission or task-archive transaction blocks lifecycle writes and runtime mutation until `task recover` resolves it.
@@ -698,11 +797,23 @@ The Router consumes the same compiled admission policy as the adapter. It may re
 
 ## 19. Route Decision Contract
 
+Route Decision is a closed discriminated union:
+
+| `operation` | Allowed `route` | Required branch fields | Effect |
+|---|---|---|---|
+| `classify-only` | Any admitted route | No intent, task-ref, challenge, or approval fields | Read-only result; never accepted by an execution loader or `task admit` |
+| `execute-light` | `native-light` only | `intent_id`, `intent_digest` | Enters the platform's bound native-light path; creates no Trellis task or integration state |
+| `create-integrated-task` | `trellis-native` or `speckit-superpowers` only | Intent, task ref, absence precondition, fresh challenge, and `task_creation_approval: required` | May be consumed only by `task admit` with a matching approval proof |
+
+All branches contain the authority snapshot, policy inputs and results, platform and adapter identity, `decision_id`, and `decision_digest`. Fields belonging to another branch are schema errors rather than ignored data.
+
+The integrated branch is:
+
 ```yaml
 schema_version: 1
 decision_id: decision-uuid
 decision_digest: sha256-value
-operation: create-task
+operation: create-integrated-task
 requested_task_ref: .trellis/tasks/001-feature
 task_ref_precondition: absent
 intent_id: feature-intent-id
@@ -729,15 +840,44 @@ reasons: []
 task_creation_approval: required
 ```
 
-For a task-creating decision, the caller supplies a normalized proposed task ref plus a Task Intent document; the CLI validates the ref and computes `intent_digest`. The intent schema includes stable intent identity, title, concise objective, requested mode if explicit, acceptance summary, and the candidate signal IDs. The caller cannot substitute a different task ref, intent, or operation during admission. Classification-only decisions use `operation: classify-only` and omit task-creation fields.
+For `execute-light` and `create-integrated-task`, the caller supplies a Task Intent document and the calculator computes `intent_digest`. The intent schema includes stable intent identity, title, concise objective, requested mode if explicit, acceptance summary, and the candidate signal IDs. The integrated branch additionally validates the normalized proposed task ref. The caller cannot substitute a different intent, task ref, or operation at the consuming loader. `classify-only` contains neither an intent nor task-creation fields and cannot be promoted in place; a later executable calculation rereads current authority.
 
-The issuer generates a fresh cryptographically random 256-bit approval challenge, normalizes the payload excluding `decision_id` and `decision_digest`, derives `decision_id` as UUIDv5 over the payload hash in the fixed Agent Workflow Pack route namespace, and then computes `decision_digest` over the normalized payload plus derived ID. Policy evaluation remains deterministic, but each task-creation decision envelope is unique because the challenge is unique. Explanatory reasons participate in the digest but never alter policy evaluation.
+For `create-integrated-task`, the calculator generates a fresh cryptographically random 256-bit approval challenge. It normalizes each branch payload excluding `decision_id` and `decision_digest`, derives `decision_id` as UUIDv5 over the payload hash in the fixed Agent Workflow Pack route namespace, and then computes `decision_digest` over the normalized payload plus derived ID. Policy evaluation remains deterministic, while each integrated admission envelope is unique because its challenge is unique. Explanatory reasons participate in the digest but never alter policy evaluation.
 
-`task_state_digest` covers the canonical non-archived-task scan, active pointers, modes, lifecycle revisions, pinned contract digests, and the requested task-ref absence precondition observed at decision time; it is null only for a classification-only project with no task-state inputs. Staging under `.agent-workflow/local/` does not alter this digest. Any intervening admission, transition, archive, pointer change, or creation of the requested ref makes the decision stale.
+`task_state_digest` covers the canonical non-archived-task scan, active pointers, modes, lifecycle revisions, and pinned contract digests. The integrated branch also covers the requested task-ref absence precondition. It is null only for a classification-only project with no task-state inputs. Staging under `.agent-workflow/local/` does not alter this digest. Any intervening admission, transition, archive, pointer change, or relevant ref creation makes an executable Decision stale.
 
-This decision is not authenticated by a secret signature. Its enforcement comes from independent reproducibility: every loader reads the current authorities, recomputes both identities, reruns the compiled policy over the supplied stable signal IDs, and requires exact agreement on route, matched rules, entry owner, task state, adapter version, and approval requirement. A hand-written, modified, stale, or copied decision cannot bypass the loader even if it is syntactically valid.
+Route Decisions are not signed and have no issuer-authenticity guarantee. The calculator, UUID, and digest prove only canonical internal consistency and freshness for the supplied fields. A policy-consistent envelope constructed elsewhere is indistinguishable from calculator output and is not treated as trusted because of its claimed origin. Every execution loader therefore rereads current authorities, recomputes identities, reruns the compiled policy over the supplied stable signal IDs, validates the operation/route union, and requires exact agreement on route, matched rules, entry owner, task state, adapter version, and approval requirement. Modified, inconsistent, stale, or cross-operation envelopes fail; origin alone is never an authorization input.
 
-Task-creation approval and implementation activation are separate gates. The enforced platform approval mechanism returns a one-time proof binding approval ID, approval challenge, Route Decision digest, task ref, intent digest, operation, workspace instance, actor, time, and verifier ID/version. `task admit` accepts no free-form override for those fields and records the verified proof in revision 1. The proof may be consumed only by one task-admission transaction; recovery may continue that same transaction but may not apply it to another ref. Implementation activation belongs in the heavy branch after the task exists.
+Deterministic routing begins only after candidate signal IDs are supplied. The pack cannot prove that a model or user extracted every relevant signal from natural language, and omission of a signal is outside the technical enforcement guarantee. Platform instructions require conservative extraction and golden tests cover known cases, but natural-language classification remains an instruction-level quality boundary rather than a security boundary.
+
+Integrated task-creation approval and implementation activation are separate gates. The enforced platform approval mechanism returns a one-time proof binding approval ID, approval challenge, Route Decision digest, task ref, intent digest, `operation: create-integrated-task`, workspace instance, actor, time, and verifier ID/version. It proves direct approval of that envelope, not completeness of signal extraction or exclusive calculator origin. `task admit` accepts no free-form override for those fields and records the verified proof in revision 1. The proof may be consumed only by one task-admission transaction; recovery may continue that same transaction but may not apply it to another ref. `classify-only` and `execute-light` never carry task-creation approval fields. Implementation activation belongs in the heavy branch after the task exists.
+
+The approval verifier emits a versioned envelope through the platform's enforced confirmation channel:
+
+```yaml
+schema_version: 1
+approval_id: approval-uuid
+verifier_id: platform-approval-verifier
+verifier_version: 1.0.0
+platform: codex
+harness_version: pinned-version
+actor:
+  id: platform-human-actor-id
+  kind: direct-human
+issued_at: 2026-07-13T15:00:00Z
+expires_at: 2026-07-13T15:15:00Z
+workspace_instance_id: clone-local-uuid
+operation: create-integrated-task
+task_ref: .trellis/tasks/001-feature
+intent_digest: sha256-value
+route_decision_digest: sha256-value
+approval_challenge: random-256-bit-value
+verifier_receipt: opaque-platform-verifier-value
+```
+
+The adapter capability manifest binds verifier ID/version to exact supported harness versions and proves that `actor.id`, timestamps, challenge, and receipt come from the confirmation mechanism rather than model-authored CLI input. `task admit` requires `kind: direct-human`, verifies the profile TTL and clock-skew limits, and rejects an unsupported verifier version. Existing unfinished admission journals pin their verifier version and recovery runtime; an upgrade that cannot continue that verifier contract is blocked. New verifier versions apply only to new approvals.
+
+Replay detection uses `.agent-workflow/local/approval-replay.json`, written only by the Task-state Service under the runtime-state gate. Before staging, the service persists the planned task journal and then CAS-reserves the tuple `(approval_id, approval_challenge, route_decision_digest, workspace_instance_id, task_transaction_id)`. Resume may use that reservation only for the same transaction. Commit or rollback marks it consumed and never deletes it; a fresh clone cannot replay the proof because the workspace identity differs. Missing, duplicated, expired, or conflicting reservations block admission.
 
 Conflicting explicit selection and pinned task mode blocks. Multiple active tasks with inconsistent pointers, missing decision identity, or mismatched profile/policy/contract digests also block.
 
@@ -762,6 +902,10 @@ The descriptor is a managed artifact recorded in the Manifest and includes at le
 {
   "schema_version": 1,
   "launcher_contract_version": 1,
+  "release_id": "sha256-release-identity",
+  "release_manifest_digest": "sha256-value",
+  "release_trust_policy_id": "github-immutable-release-v1",
+  "release_trust_policy_digest": "sha256-value",
   "pack_version": "0.1.0",
   "distribution": "agent-workflow-pack",
   "entry_point": "agent-stack",
@@ -773,17 +917,29 @@ The descriptor is a managed artifact recorded in the Manifest and includes at le
 }
 ```
 
-The launcher embeds the descriptor digest and the same immutable wheel identity. Before dispatch it verifies the descriptor's byte hash, the presence and schema of the Manifest, the Manifest file record for the descriptor, the installed `pack_version`, maintenance state, and the tested `uv` version policy. The selected CLI then repeats the Manifest, descriptor, source-commit, package-version, and command-eligibility checks. Ordinary runtime commands require exact agreement among launcher, descriptor, Manifest, and running CLI.
+The descriptor is rendered only from a detached manifest already verified under the packaged trust policy. The launcher embeds the descriptor digest, Release Identity, detached-manifest digest, and the same immutable wheel identity. Before dispatch it verifies the descriptor's byte hash, the presence and schema of the project Manifest, the Manifest file record for the descriptor, installed Release Identity and `pack_version`, maintenance state, and the tested `uv` version policy. It resolves the wheel URL and hash only from the cached verified detached manifest matching the descriptor digest. The selected CLI then repeats the Manifest, descriptor, source-commit, package-version, Release Identity, release-manifest, and command-eligibility checks. Ordinary runtime commands require exact agreement among launcher, descriptor, project Manifest, verified detached manifest, and running CLI.
 
-Invocation is offline-first against the exact wheel URL plus SHA-256. On a cache miss, the launcher may retry online only when the descriptor permits pinned redownload; redirects and the final artifact remain subject to the locked URL and hash rules. This narrowly scoped bootstrap may fetch only its embedded release wheel before full CLI validation and may not fetch workflow dependencies or project-supplied URLs. Offline cache miss, missing or unsupported `uv`, hash failure, source-commit mismatch, or pack-version mismatch returns a stable runtime-bootstrap error and performs no fallback to latest, source checkout, global installation, or PATH.
+Invocation is offline-first against the exact wheel identity obtained from the cached verified detached manifest. On a cache miss, the launcher may retry online only when the descriptor permits pinned redownload and the trust-policy-derived immutable release and detached manifest reverify first; redirects and the final artifact remain subject to the policy host allowlist, manifest size, and hash. This narrowly scoped bootstrap may fetch only that manifest-authorized release wheel before full CLI validation and may not fetch workflow dependencies or project-supplied URLs. Offline cache miss, manifest-verification failure, missing or unsupported `uv`, wheel hash failure, Release Identity mismatch, source-commit mismatch, or pack-version mismatch returns a stable runtime-bootstrap error and performs no fallback to latest, source checkout, global installation, or PATH.
 
 A fresh clone receives the committed launcher, descriptor, Manifest, and workflow lock even though local state is absent. The launcher therefore permits `workspace register` and read-only diagnostics before local registration; other runtime and write commands remain blocked.
 
-Every Reconciler or task transaction journal records a `recovery_runtime` containing pack version, wheel URL, wheel SHA-256, source commit, and launcher-contract version before its first target mutation. While a transaction is unfinished, the launcher ignores the ordinary descriptor for command selection and permits only read-only diagnostics plus the matching `recover` command through that journal-pinned runtime. An unfinished task transaction therefore blocks `route decide`, task loaders, and every unrelated write command. This works whether a crash occurred before or after candidate launcher files were replaced.
+Every Reconciler or task transaction journal records only a non-authoritative runtime reference before its first target mutation:
+
+```yaml
+recovery_runtime:
+  runtime_role: committed # or candidate
+  release_id: sha256-release-identity
+  release_manifest_digest: sha256-value
+  launcher_contract_version: 1
+```
+
+The journal may not contain a wheel URL, asset hash, repository, tag, or trust-policy override. The launcher accepts `runtime_role: committed` only when the reference equals the Release Identity and detached-manifest digest in the committed project Manifest. It accepts `candidate` only when the reference equals the candidate Manifest and approved plan, the candidate detached manifest is already cached and independently re-verifies under the committed trust policy, and the verified compatibility edge authorizes the installed-to-candidate transition. A journal mismatch cannot expand this two-entry allowlist and fails before candidate code executes.
+
+While a transaction is unfinished, the launcher permits only read-only diagnostics plus the matching `recover` command through the selected allowed runtime. An unfinished task transaction therefore blocks `route decide`, task loaders, and every unrelated write command. This works whether a crash occurred before or after candidate launcher files were replaced.
 
 Launcher and descriptor changes are ordinary managed artifacts with byte-and-mode CAS, backups, and atomic rename. Compatibility metadata must prove that both the preimage and candidate launcher contracts understand the transaction's recovery-runtime schema. Manifest commit switches the normal runtime authority; pre-commit rollback restores the prior launcher and descriptor, while post-commit recovery performs cleanup only.
 
-A forward upgrade is invoked through the exact target-release wheel using the canonical external `uvx` command. A mismatched external CLI may run only `upgrade` when a trusted compatibility edge authorizes the installed-to-running transition; all other commands fail closed. Rollback to a listed earlier release may be orchestrated by the currently installed launcher runtime. After upgrade commit, all normal wrapper calls use the newly committed descriptor.
+A forward upgrade begins in the trusted committed runtime, which verifies the target detached manifest and wheel before invoking that exact local wheel for the upgrade-only entry. A mismatched external CLI may run only `upgrade` when its verified Release Identity and compatibility edge authorize the installed-to-running transition; all other commands fail closed. Rollback to a listed earlier release may be orchestrated by the currently installed launcher runtime through the same detached-manifest verification. After upgrade commit, all normal wrapper calls use the newly committed descriptor.
 
 Only allowlisted leaf skills enter platform auto-discovery directories. Route-gated content is installed under a managed, non-discoverable catalog:
 
@@ -801,7 +957,7 @@ Non-discoverability is an exposure boundary, not a filesystem or security bounda
 Before loading a runtime entry, the wrapper validates:
 
 - maintenance state;
-- Route Decision schema, identity, digest, and deterministic policy replay;
+- Route Decision branch schema, identity, digest, operation/route legality, and deterministic policy replay;
 - route and pinned mode;
 - current phase;
 - entry owner;
@@ -814,6 +970,8 @@ Direct platform entry points for `/speckit.implement`, Trellis implement/check, 
 Discoverable leaf skills undergo transitive-reference validation. If their locked upstream content references `using-superpowers`, planners, executors, or other gated entries, the pack must apply a first-party, locked compatibility overlay or block projection. A skill is not considered safe merely because its name appears leaf-like.
 
 `heavy-development-router` is the sole top-level orchestrator only after admission selects `mode: speckit-superpowers`. It is not the global router for lightweight or Trellis-native tasks.
+
+The `execute-light` adapter enters only the platform binding for `native-light`; it cannot load the heavy router, Trellis task runtime, or `task admit`. A `classify-only` result is presentation data and every execution wrapper rejects it.
 
 ## 21. Integration State Contract
 
@@ -844,7 +1002,7 @@ lifecycle:
   last_transition: {}
 
 admission:
-  operation: create-task
+  operation: create-integrated-task
   task_ref: .trellis/tasks/example
   intent_id: feature-intent-id
   intent_digest: sha256-value
@@ -895,7 +1053,7 @@ speckit_superpowers:
 
 The heavy branch retains `authority.active_feature`, `canonical_artifacts`, `reference_only_artifacts`, phase, completion flags, and the structured executor claim from the current custom router contract. Common lifecycle retains `last_transition` and `blocked_reason` for both modes.
 
-`lifecycle.status` is one of `active`, `blocked`, `completed`, `archiving`, or `archived`. `blocked` requires a non-null reason. `completed` means implementation and verification are complete, but finish, journal, memory, review, publication, or Trellis archive obligations may remain. `archiving` identifies an unfinished archive transaction. The states `active`, `blocked`, `completed`, and `archiving` all remain active for safety gates; only `archived` is non-gating. Archiving records `archived_at` through the task-state mutation protocol; deleting the file is not an archive operation. Resume always uses the pinned mode and contract and never reclassifies the task.
+`lifecycle.status` is one of `admitting`, `active`, `blocked`, `completed`, `archiving`, or `archived`. `admitting` identifies a task whose directory exists but whose Trellis metadata has not yet reached the admission commit point; it is never runnable or resumable. `blocked` requires a non-null reason. `completed` means implementation and verification are complete, but finish, journal, memory, review, publication, or Trellis archive obligations may remain. `archiving` identifies an unfinished archive transaction. The states `admitting`, `active`, `blocked`, `completed`, and `archiving` all remain active for safety gates; only `archived` is non-gating. Archiving records `archived_at` through the task-state mutation protocol; deleting the file is not an archive operation. Resume always uses the pinned mode and contract and never reclassifies the task.
 
 ### 21.1 Atomic Task Admission
 
@@ -903,21 +1061,28 @@ Task creation is a Task-state Service transaction, not a prerequisite performed 
 
 `task admit` executes this order while holding the exclusive runtime-state gate and the task-ref lock:
 
-1. Validate the current Manifest, workspace identity, task-bound Route Decision, one-time approval proof, requested-ref absence, task-state digest, adapter contract, and all pinned runtime digests.
-2. Atomically persist a `planned` journal binding the decision, approval-proof digest, intent, task ref, operation, candidate generator, recovery runtime, and every precondition. Only then create staging residue.
-3. Render the complete locked Trellis task shell and `integration.yaml` revision 1 under the staging root. No direct Trellis create command may write the target project. Validate the entire tree, record every file byte hash and normalized POSIX mode, and advance the journal to `staged`.
-4. Revalidate the task ref, active pointers, decision, approval, and tree digest. Atomically rename the staged task directory to `requested_task_ref`; this directory rename is the task-admission commit point.
-5. Perform the locked Trellis adapter's index or active-pointer coordination, advance through `task_committed` and `cleanup_pending`, then remove staging residue and mark the journal `complete`.
+1. Validate the current Manifest, workspace identity, `create-integrated-task` Decision, one-time approval proof, requested-ref absence, task-state digest, adapter contract, and all pinned runtime digests.
+2. Atomically persist a `planned` journal binding the decision, verifier envelope and proof digest, intent, task ref, operation, candidate generator, recovery runtime, and every precondition. CAS-reserve that approval in the workspace replay ledger for the same transaction. Only then create staging residue.
+3. Render the complete locked Trellis task shell and `integration.yaml` revision 1 under the staging root. Revision 1 has `lifecycle.status: admitting`, `state_revision: 1`, and `admitted_at: null`. No direct Trellis create command may write the target project. Validate the entire tree, record every file byte hash and normalized POSIX mode, and advance the journal to `staged`.
+4. Revalidate the task ref, active pointers, decision, approval, and tree digest. Atomically rename the staged task directory to `requested_task_ref` and advance to `task_moved`. The directory is now visible but remains non-runnable and uncommitted because its integration status is `admitting`.
+5. Apply the locked Trellis adapter's index, active-pointer, and required journal-file candidates with byte-and-mode CAS, backups, and atomic replacement. Revalidate that every metadata path equals its recorded candidate and advance to `metadata_applied`.
+6. CAS the integration preimage from the exact `admitting` revision 1 to `active` revision 2, set `admitted_at`, and record the transaction in `last_transition`. This atomic integration rename is the task-admission commit point.
+7. Advance through `admission_committed` and `cleanup_pending`, durably enqueue any allowed post-commit effects, remove staging and backup residue, and mark the journal `complete`.
 
-The task candidate tree uses a deterministic Merkle digest over repo-relative paths, bytes, and normalized modes. To avoid self-reference, the schema excludes `admission.candidate_tree_digest` itself when calculating that digest. Revision 1 records the transaction ID and resulting digest. If the process dies after the directory rename but before the journal advances, recovery recognizes a committed admission only when the target is a real non-symlink directory, its integration state binds the same transaction ID, and its recomputed candidate-tree digest matches. Otherwise recovery blocks without deleting or replacing the target.
+The task candidate tree uses a deterministic Merkle digest over repo-relative paths, bytes, and normalized modes. To avoid self-reference, the schema excludes `admission.candidate_tree_digest` itself when calculating that digest. Revision 1 records the transaction ID and resulting admitting-tree digest. If the process dies after the directory rename but before the journal advances, recovery recognizes `task_moved` only when the target is a real non-symlink directory, its integration state is the matching `admitting` revision, and its recomputed candidate-tree digest matches. If the integration state is the matching `active` revision 2 and every Trellis metadata path reached its recorded candidate, recovery recognizes `admission_committed` even when the journal did not advance. Any other combination blocks without accepting, deleting, or replacing the target.
 
 Admission phases are:
 
 ```text
-planned -> staged -> task_committed -> cleanup_pending -> complete
+planned -> staged -> task_moved -> metadata_applied
+        -> admission_committed -> cleanup_pending -> complete
 ```
 
-At `planned` or `staged`, `task recover --rollback` may remove only recorded staging residue after CAS validation; the approval proof remains bound to that transaction and may be reused only by `--resume` of the same journal. At `task_committed` or later, rollback is forbidden: recovery may only finish adapter coordination and cleanup. A committed task may be archived later through a new task transaction, never erased as admission recovery.
+Before `admission_committed`, validated recovery may resume or roll back. At `planned` or `staged`, rollback removes only recorded staging residue. At `task_moved` or `metadata_applied`, rollback first restores every changed Trellis metadata preimage under CAS, then reverses the task-directory move only when the complete admitting tree still matches its recorded digest and type. A rollback marks the approval reservation consumed permanently; only `--resume` of the same unfinished journal may use a reserved proof. At `admission_committed` or later, rollback is forbidden: recovery may only finish outbox enqueue and cleanup. A committed task may be archived later through a new task transaction, never erased as admission recovery.
+
+Only reversible declared file operations are allowed before admission commit. The integrated overlay disables upstream task-create hooks, notifications, subprocess callbacks, network actions, and automatic Git commits during the transaction. Required Trellis journal content must be represented as a declared CAS-managed file candidate; an opaque journal command is not allowed. Automatic Git commit is disabled entirely in v0.1 and remains a user action.
+
+Optional post-commit hooks may run only through `.agent-workflow/local/task-outbox/<effect-id>.json`. Each effect has a deterministic idempotency key derived from transaction ID, handler ID/version, and payload digest. Admission recovery durably enqueues effects before cleanup, but effect success is not part of task acceptance and cannot roll back an active task. A handler that cannot prove idempotent replay is unsupported and must remain disabled. Correctness-critical effects belong in the pre-commit file transaction rather than the outbox.
 
 ### 21.2 Atomic Task Archive
 
@@ -935,6 +1100,10 @@ planned -> state_marked -> task_moved -> metadata_applied
 ```
 
 Before the archive commit point, validated recovery may resume or roll back the journal, including reversing a directory move only when source/destination type, tree digest, integration state, and every Trellis metadata preimage still satisfy CAS. After the commit point, recovery may perform cleanup only. If external changes make either direction unsafe, automatic recovery stops with a manual-recovery report and the task remains gating. Trellis archive indexes, task location, integration lifecycle, and active pointers may never be accepted as partially consistent success.
+
+Only reversible declared file operations are allowed before archive commit. The integrated overlay disables upstream finish/archive hooks, notifications, subprocess callbacks, network actions, and automatic Git commits during the transaction. Required Trellis journal or index changes must be explicit CAS-managed file candidates; an opaque archive command with additional side effects is not allowed. Automatic Git commit remains disabled entirely in v0.1.
+
+Optional archive post-commit effects use the same non-authoritative task outbox contract as admission. Recovery durably enqueues them before cleanup with deterministic idempotency keys, but delivery success is not part of archive acceptance and cannot roll an `archived` task back to a gating state. A non-idempotent handler is unsupported, and any correctness-critical archive effect must be part of the pre-commit CAS-managed file transaction.
 
 ### 21.3 Ordinary State Mutation
 
@@ -964,7 +1133,7 @@ enforced > instruction-only > unsupported
 - `instruction-only`: compliance depends on model instructions and cannot be described as a technical guarantee.
 - `unsupported`: the platform has no corresponding mechanism.
 
-`task_admission_gate: enforced` specifically requires a mechanism that distinguishes a direct user confirmation from model-generated command input and offers no unwrapped non-interactive task-creation path. `task_archive_gate: enforced` requires all supported Trellis finish/archive paths for integrated tasks to pass through the recoverable archive transaction. A plain prompt instructing the model to ask first or use the wrapper is only `instruction-only`.
+`task_admission_gate: enforced` specifically requires a mechanism that distinguishes a direct user confirmation from model-generated command input, offers no unwrapped non-interactive task-creation path, prevents `admitting` tasks from being resumed or executed, and suppresses upstream pre-commit hooks and automatic Git commits. `task_archive_gate: enforced` requires all supported Trellis finish/archive paths for integrated tasks to pass through the recoverable archive transaction. A plain prompt instructing the model to ask first or use the wrapper is only `instruction-only`.
 
 Adapter capability manifests bind claims to adapter and harness versions. Each manifest contains a platform ID, adapter version, a non-empty list of exact tested harness versions or closed tested version ranges, the measured level of each capability, the probe used by `doctor`, and the integration-evidence identifier. A range may be declared only when every boundary version and the project's compatibility policy have been tested.
 
@@ -1076,15 +1245,20 @@ Golden cases use normalized signal IDs and cover:
 - native-light small fixes;
 - multi-module contract changes;
 - active heavy-task resume;
-- stale, copied, or field-tampered Route Decisions.
+- stale, cross-workspace or cross-intent copied, or field-tampered Route Decisions;
+- every legal and illegal operation/route pairing in the closed Decision union;
+- `classify-only` rejection by every execution loader;
+- `execute-light` creating no Trellis task or integration state;
+- `create-integrated-task` requiring both integrated route and approval proof;
+- policy-consistent externally reconstructed envelopes receiving no issuer-origin privilege and being judged only by replay, freshness, and branch gates.
 
-Natural-language classification evaluation may be added later as a non-blocking eval suite.
+Natural-language classification evaluation may be added later as a non-blocking eval suite. Deterministic `test-routing` begins from normalized signal IDs and does not claim to detect omitted signals.
 
 ## 26. Test Strategy
 
 ### 26.1 Schema, Canonicalization, and Property Tests
 
-Test duplicate YAML keys, inheritance cycles, unknown fields, JCS digests, set sorting, Merkle inputs, path normalization, POSIX-mode normalization, marker parsing, release-compatibility edges, and manifest generations. Property/fuzz tests target path normalization, archive extraction, URL handling, and marker parsers.
+Test duplicate YAML keys, inheritance cycles, unknown fields, JCS digests, set sorting, Merkle inputs, path normalization, POSIX-mode normalization, marker parsing, Release Identity, detached-manifest trust rules, release-compatibility edges, closed Route Decision branches, approval-verifier envelopes, replay reservations, and Manifest generations. Property/fuzz tests target path normalization, archive extraction, release-manifest URLs and redirects, general URL handling, and marker parsers.
 
 ### 26.2 Resolver and Policy Tests
 
@@ -1100,7 +1274,7 @@ Use temporary projects to test every ownership class, protected paths, symlink r
 
 ### 26.5 Crash and Concurrency Tests
 
-Inject process termination at each Reconciler, task-admission, and task-archive phase. Test two CLI writers, two admissions for one task ref, two claimants at the same revision, task mutation against maintenance admission, admission crash immediately before and after the task-directory rename, archive crash around the directory move and integration commit, task-transaction blocking, cache contention, external byte or mode modification immediately before rename, manifest-committed cleanup, and CAS rollback refusal.
+Inject process termination at each Reconciler, task-admission, and task-archive phase. Test two CLI writers, two admissions for one task ref, duplicate approval proofs, two claimants at the same revision, task mutation against maintenance admission, admission crash around task move, metadata application, and the `admitting -> active` commit, archive crash around the directory move and integration commit, task-transaction blocking, outbox replay idempotency, disabled pre-commit hooks and Git auto-commit, cache contention, external byte or mode modification immediately before rename, manifest-committed cleanup, and CAS rollback refusal.
 
 ### 26.6 End-to-end Sequence
 
@@ -1110,7 +1284,8 @@ init
   -> test-routing
   -> no-op sync
   -> route decide + direct approval
-  -> injected task-admission crash + task recover
+  -> injected task-admission crash while admitting + task recover
+  -> assert metadata consistency before active commit
   -> drift conflict
   -> assert zero writes
   -> injected crash during apply
@@ -1132,13 +1307,20 @@ Build and test both wheel and sdist. Installation tests run from the built artif
 
 The sdist contains the same vendored runtime sources as the wheel. Release CI builds both artifacts in the `uv.lock`-controlled build environment and verifies that the wheel metadata has an empty external runtime `Requires-Dist` set. Build-system dependencies remain build-time concerns and are not represented as consumer runtime reproducibility.
 
-Cross-distribution rendering compares a `distribution_render_digest`: the deterministic Merkle root of managed artifact paths, rendered bytes, normalized modes, and profile/lock/artifact-bundle-derived content. It excludes Manifest generations, project and workspace UUIDs, target-path identities, transaction IDs, approval evidence, maintenance state, probe evidence, and ignored local state. Tests that compare a complete plan or tree must inject a deterministic identity provider; AC-14 does not require independently generated runtime identities to be byte-equal.
+Cross-distribution rendering compares a `distribution_render_digest`: the deterministic Merkle root of managed artifact paths, rendered bytes, normalized modes, Release Identity, and profile/lock/artifact-bundle-derived content. Git checkout, wheel, and sdist tests supply the same verified detached release manifest, so asset-derived launcher fields are identical without placing asset hashes inside the distributions. The digest excludes Manifest generations, project and workspace UUIDs, target-path identities, transaction IDs, approval evidence, maintenance state, probe evidence, and ignored local state. Tests that compare a complete plan or tree must inject a deterministic identity provider; AC-14 does not require independently generated runtime identities to be byte-equal.
 
-The canonical end-user `uvx` command installs the exact wheel asset of a verified immutable GitHub release. Release metadata binds that immutable release and asset hash to the actual full 40-hex source commit SHA. A source-audit command may use the full commit SHA directly, but release acceptance must execute the built wheel and sdist rather than relying only on a source checkout. A movable ordinary tag is never a trust anchor.
+Release CI first fixes the Release Identity and all bundle roots, then builds the wheel and sdist. Only after both distributions are final does it compute their byte hashes and sizes, generate the detached `release-manifest.json`, and publish all three assets to the exact repository and tag required by the trust policy. It then verifies the GitHub release is immutable. The detached manifest is never rebuilt into either distribution.
+
+The canonical end-user `uvx` command is generated from the verified detached manifest and installs its exact wheel URL with the manifest-bound SHA-256. Release acceptance verifies the immutable GitHub release and manifest before executing that command. A source-audit command may use the full source commit directly but must compute the same Release Identity; acceptance still executes the built wheel and sdist rather than relying only on a checkout. A movable ordinary tag, project-supplied URL, or unverified manifest is never a trust anchor.
+
+First installation is the sole user-selected bootstrap boundary: the user obtains that hash-bound command from the pinned repository's immutable release. Before `init` performs any target write, the running wheel independently retrieves and verifies the detached manifest through its packaged trust policy and confirms that its own Release Identity, source commit, bundle roots, asset name, size, and hash match. Later project launch and upgrade never accept a new release location from user-controlled project state.
 
 Release gates require:
 
 - wheel, sdist, and Git-checkout `distribution_render_digest` values are identical;
+- wheel, sdist, and Git checkout compute one Release Identity, while their detached manifest binds the final distribution hashes without being packaged inside them;
+- release-manifest verification rejects the wrong repository, tag, mutable release, redirect host, asset size/hash, source commit, or bundle identity;
+- recovery journals containing URLs, hashes, trust-policy overrides, or runtime identities outside the committed/candidate allowlist are rejected before execution;
 - all default platforms meet their profile-required capability levels;
 - a clean WSL/Linux environment initializes from the published artifact;
 - a fresh clone runs `workspace register` and `route decide` through the project launcher with cache-hit, permitted pinned-redownload, offline-miss, hash-mismatch, version-mismatch, and unfinished-transaction recovery cases;
@@ -1180,7 +1362,7 @@ The current custom skills are migration inputs, not automatically valid release 
 
 ## 30. v0.1 Acceptance Criteria
 
-- **AC-01:** A clean WSL/Linux target initializes through `uvx` from the exact self-contained wheel asset of a verified immutable release whose metadata identifies the full source commit SHA and asset hash; the corresponding sdist builds the same self-contained runtime and passes the same installation scenario.
+- **AC-01:** A clean WSL/Linux target initializes through the exact self-contained wheel selected by a detached manifest from the pinned GitHub repository's immutable release; the manifest binds its hash, size, Release Identity, source commit, and bundle roots, and the corresponding sdist passes the same trust and installation scenario.
 - **AC-02:** `sol56-sdd` materializes Claude Code, Codex, and OpenCode only when each satisfies the profile's strict capability requirements.
 - **AC-03:** `doctor` and deterministic routing tests pass immediately after initialization.
 - **AC-04:** A second `sync` produces a verified no-op and performs no target writes.
@@ -1193,21 +1375,25 @@ The current custom skills are migration inputs, not automatically valid release 
 - **AC-11:** Maintenance blocks new admission, task resume, phase advancement, and write-type runtime entry.
 - **AC-12:** Every non-archived heavy task blocks contract-changing upgrade; affected non-archived Trellis-native tasks also block.
 - **AC-13:** Disabled or gated pack-managed skills are neither auto-discoverable nor transitively referenced by discoverable leaves.
-- **AC-14:** Wheel, sdist, and Git-checkout renders have identical `distribution_render_digest` values over managed profile/lock/bundle-derived output; clone-local and transaction identities are excluded.
+- **AC-14:** Wheel, sdist, and Git-checkout renders use one logical Release Identity and the same verified detached manifest, producing identical `distribution_render_digest` values over managed profile/lock/bundle-derived output; clone-local and transaction identities are excluded.
 - **AC-15:** Provenance, full licenses, notices, lock hashes, and target notices are complete for every projected third-party artifact.
 - **AC-16:** JSON output, exit codes, and redaction pass their versioned contract tests.
 - **AC-17:** The legacy `workflow-pack` migration fixture retains all protected Trellis and Spec Kit runtime state.
-- **AC-18:** `upgrade --to` rejects every target absent from the explicit directed compatibility matrix and never launches an older CLI against current state.
+- **AC-18:** `upgrade --to` rejects every target absent from the explicit directed compatibility matrix and verifies the target detached manifest, distribution hash, Release Identity, and static compatibility metadata before candidate code runs.
 - **AC-19:** File-state CAS detects byte, type, symlink, and POSIX-mode changes, including executable-bit drift.
 - **AC-20:** Write commands refuse filesystems that fail advisory-lock, atomic-replace, mode, or path-collision probes; `/mnt/*` receives no implicit exemption.
 - **AC-21:** Concurrent executor claims at one base revision result in exactly one successful atomic state transition.
 - **AC-22:** A model-generated Route Decision or command flag cannot satisfy the enforced user approval required by `task admit`.
 - **AC-23:** A fresh clone must register a new local workspace identity before writes, and a saved plan from another clone is rejected by default.
-- **AC-24:** A fresh clone can execute `workspace register` and `route decide` through the managed version-pinned launcher; cache miss, wheel-hash mismatch, source/pack-version mismatch, or unavailable offline runtime fails closed without PATH or latest-version fallback.
-- **AC-25:** Route Decisions and approval proofs bind one task ref, intent, operation, workspace, and one-time challenge. The task shell and integration revision 1 commit through one atomic directory rename; every admission or archive crash point is diagnosable, recoverable under CAS, and blocked from becoming a partially accepted task state.
+- **AC-24:** A fresh clone can execute `workspace register` and `route decide` through the managed version-pinned launcher; detached-manifest cache miss, trust-policy mismatch, wheel-hash mismatch, Release Identity/source/pack-version mismatch, or unavailable offline runtime fails closed without PATH or latest-version fallback.
+- **AC-25:** Every `create-integrated-task` Decision and approval proof binds one task ref, intent, operation, workspace, and one-time challenge. The task shell and integration revision 1 commit through the specified admission transaction; every admission or archive crash point is diagnosable, recoverable under CAS, and blocked from becoming a partially accepted task state.
 - **AC-26:** Ordinary `doctor` and every `--dry-run` perform zero target writes. Filesystem mutation probes run only through explicit `doctor --write-probe` or inside an approved apply transaction after lock acquisition, and interrupted probe residue is tracked and safely recoverable.
 - **AC-27:** A `completed` but non-archived task remains gating; only a fully committed `archived` lifecycle state permits an otherwise compatible contract-changing upgrade.
 - **AC-28:** A locked initializer whose candidate content-root digest is unstable or differs from its lock-bound contract blocks both release and runtime materialization rather than becoming a silent file diff.
+- **AC-29:** No wheel, sdist, source commit, compatibility bundle, or Release Identity contains its own container or bundle hash. Only the verified detached manifest binds distribution hashes, and transaction journals cannot introduce release URLs, hashes, or trust-policy overrides.
+- **AC-30:** Route Decision validates as exactly one of `classify-only`, `execute-light`, or `create-integrated-task`; illegal route/operation or cross-branch fields produce no executable Decision, and policy replay guarantees only the result for supplied signal IDs, not issuer authenticity or natural-language signal completeness.
+- **AC-31:** A newly moved task remains `admitting` and non-runnable until all declared Trellis metadata matches its CAS candidate and integration atomically transitions to `active`. Admission and archive pre-commit phases allow only reversible declared file operations; hooks, notifications, subprocess callbacks, network actions, and Git auto-commit cannot create untracked side effects. Optional post-commit effects use the idempotent non-authoritative outbox and cannot alter the committed lifecycle state.
+- **AC-32:** Approval verifier envelopes bind direct-human actor, supported verifier/harness version, workspace, decision, challenge, task, intent, and finite validity window; concurrent or replayed proofs result in at most one reserved admission transaction.
 
 ## 31. Implementation Decomposition
 
@@ -1216,9 +1402,9 @@ The approved design should be implemented through separate feature specs, in thi
 1. **Core schemas and Resolver** — profiles, catalog, locks, canonicalization, artifact definitions, IR, policy graph, and diagnostics.
 2. **Providers and secure cache** — acquisition, isolation, verification, extraction limits, provenance, and cache concurrency.
 3. **Renderer and Reconciler** — staging, ownership, plans, OS lock, CAS, transactions, repair, and recovery.
-4. **Runtime launcher and Task-state Service** — pinned launcher delivery, workspace registration, integration union, task locks and CAS, claims, admission/archive transactions, recovery, and maintenance coordination.
-5. **Route admission and Platform Adapters** — compiled admission policy, Route Decisions and approval proof, runtime catalog and loaders, capability probes, adapter projection, and platform golden output.
-6. **Lifecycle, packaging, and release** — CLI commands, JSON contracts, upgrade flow, E2E tests, artifact builds, immutable trust anchors, and notices.
+4. **Runtime launcher and Task-state Service** — pinned launcher delivery, workspace registration, integration union, task locks and CAS, approval replay ledger, claims, admitting/archive transactions, idempotent outbox, recovery, and maintenance coordination.
+5. **Route admission and Platform Adapters** — compiled admission policy, closed Route Decision union, approval-verifier envelopes, runtime catalog and loaders, Trellis root/metadata contracts, capability probes, adapter projection, and platform golden output.
+6. **Lifecycle, packaging, and release** — CLI commands, JSON contracts, detached release manifests, immutable-repository trust policy, upgrade flow, E2E tests, artifact builds, trust anchors, and notices.
 
 Each feature spec must preserve the authority boundaries and acceptance criteria in this document. No feature spec may introduce a second planner, executor, route-policy source, ownership source, or task-state source.
 
@@ -1230,4 +1416,4 @@ Each feature spec must preserve the authority boundaries and acceptance criteria
 - Upstream platform and Trellis templates may change paths or hook behavior; adapter and harness versions therefore remain locked and tested.
 - Trellis-derived overlays and generated content require artifact-level provenance and license handling rather than a repository-wide assumption.
 
-All third-round written-spec review blockers have been incorporated. The document has passed the local spec self-review and remains awaiting explicit user approval; implementation planning is prohibited until that approval.
+All fourth-round written-spec review blockers have been incorporated. The document has passed the local spec self-review and remains awaiting explicit user approval; implementation planning is prohibited until that approval.
