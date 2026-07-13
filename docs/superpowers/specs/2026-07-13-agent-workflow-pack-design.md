@@ -1,6 +1,6 @@
 # Agent Workflow Pack v0.1 Design
 
-**Status:** Approved conversational design; pending written-spec review  
+**Status:** Written-spec review — revised; awaiting user approval
 **Date:** 2026-07-13  
 **Target:** New sibling repository `agent-workflow-pack`  
 **Initial profile:** `sol56-sdd`  
@@ -46,10 +46,12 @@ Each state dimension has one scoped authority.
 | `profiles/*.yaml` | Activation intent, route-admission policy selection, workflow ownership selection, platform defaults, and required capability levels |
 | Release `workflow.lock` | Default locked workflow supply chain shipped with one CLI release |
 | Target `.agent-workflow/workflow.lock` | Project-scoped workflow supply-chain identity used by `sync` |
+| `compatibility/releases.yaml` | Explicitly supported release-transition edges and the schema, artifact, and task-contract migrations required by each edge |
 | `artifact-definitions/*.yaml` | Manageable target paths, ownership class, merge strategy, stable markers, validators, and additional forbidden paths |
 | Global protected-path policy | Paths no artifact definition may target or relax |
 | `.agent-workflow/manifest.json` | What was actually materialized, the applied baselines and hashes, selected profile, digests, generation, and last committed transaction |
-| `.trellis/tasks/<task>/integration.yaml` | Runtime state of one admitted `speckit-superpowers` task, including phase, owners, pinned contract, and executor claim |
+| `.agent-workflow/local/workspace.json` | Non-Git identity of the current working copy, bound to the repository-lineage ID |
+| `.trellis/tasks/<task>/integration.yaml` | Pinned mode, workflow contract, and lifecycle of one admitted integrated task; the mode-specific branch is also authoritative for heavy-router phase, owners, artifacts, and executor claim when applicable |
 
 A profile may select a versioned artifact policy, but it cannot expand the paths authorized by artifact definitions. A manifest records prior application state but cannot authorize a future write that current definitions prohibit.
 
@@ -60,6 +62,8 @@ agent-workflow-pack/
 ├── pyproject.toml
 ├── uv.lock
 ├── workflow.lock
+├── compatibility/
+│   └── releases.yaml
 ├── profiles/
 │   ├── base.yaml
 │   ├── sol56-sdd.yaml
@@ -94,11 +98,13 @@ agent-workflow-pack/
     └── fixtures/
 ```
 
-`uv.lock` locks the Python development, test, build, and CLI runtime environment. `workflow.lock` locks the workflow components projected into target projects. Neither file substitutes for the other.
+`uv.lock` locks only the repository's Python development, test, and build environment. It does not lock the isolated consumer environment created by `uvx`. `workflow.lock` separately locks the workflow components projected into target projects. Neither file substitutes for the other.
 
-`schemas/` contains versioned schemas for profiles, catalogs, workflow locks, artifact definitions, manifests, transactions, saved plans, Desired State IR, route decisions, integration state, diagnostics, capability manifests, and provenance records.
+The v0.1 release wheel is self-contained at runtime: required pure-Python third-party runtime code is vendored under a private package namespace from hash-locked source artifacts, and the published wheel declares no external runtime `Requires-Dist` dependencies. Vendored code participates in package digests, provenance, full-license inclusion, modification notices, and vulnerability review. A required dependency that cannot be safely vendored as pure Python blocks release and requires a new design decision rather than silently adding an external runtime resolution.
 
-The supported Python range for v0.1 is `>=3.11,<3.15`, subject to the final CI matrix. A Python minor version is supported only when build, unit, integration, and packaging tests pass for that version.
+`schemas/` contains versioned schemas for profiles, catalogs, workflow locks, release compatibility, artifact definitions, manifests, transactions, saved reconcile plans, provider-execution plans and approvals, Desired State IR, route decisions, integration state, diagnostics, capability manifests, and provenance records.
+
+The supported Python range for v0.1 is `>=3.11,<3.15`. Release is blocked unless Python 3.11, 3.12, 3.13, and 3.14 each pass build, unit, integration, and packaging tests; narrowing the range requires an explicit spec and release-metadata change.
 
 ## 6. Component Boundaries and Data Flow
 
@@ -135,13 +141,17 @@ The Renderer converts the IR into a staged tree and canonical reconcile plan. Th
 
 ### 6.4 Reconciler
 
-Within an `agent-stack` installation or upgrade transaction, the Reconciler is the only component allowed to modify pack-managed or overlay-managed target content. Runtime planners, executors, Trellis, and Spec Kit may modify user-owned code, tasks, journals, and specification artifacts according to their own contracts, but may not modify pack-managed content.
+Within an `agent-stack` installation or upgrade transaction, the Reconciler is the only component allowed to modify pack-managed or overlay-managed target content. Runtime planners, executors, Trellis, and Spec Kit may modify user-owned code, task files, journals, and specification artifacts according to their own contracts, but may not modify pack-managed content or write `integration.yaml` except through the Task-state Service.
 
-### 6.5 Lifecycle Service
+### 6.5 Task-state Service
 
-The Lifecycle Service orchestrates commands and transactions but contains no independent routing or ownership policy. Read-only commands and write commands consume the same Resolver implementation and IR schema.
+The Task-state Service is the sole supported writer of `.trellis/tasks/<task>/integration.yaml`. It is a runtime-state writer, not part of the Reconciler, and has no authority over pack-managed files. Platform adapters and runtime agents call its CLI instead of editing integration state directly.
 
-### 6.6 Platform Adapters
+### 6.6 Lifecycle Service
+
+The Lifecycle Service orchestrates installation-state commands and transactions but contains no independent routing or ownership policy. Lifecycle read-only and write commands that evaluate desired state consume the same Resolver implementation and IR schema; Task-state Service mutations use their separate state-machine contract.
+
+### 6.7 Platform Adapters
 
 Adapters project resolved policy into the native files, hooks, agents, commands, and skill directories of Claude Code, Codex, and OpenCode. An adapter may not add routes, signals, owners, or capabilities absent from the resolved IR.
 
@@ -162,7 +172,10 @@ route_admission:
   trellis_native: explicit-only
 
 bindings:
-  native-light: sol-native
+  native-light:
+    codex: sol-native
+    claude: platform-native
+    opencode: platform-native
 
 skills:
   enable: []
@@ -174,7 +187,19 @@ required_capabilities:
   project_instructions: instruction-only
   explicit_runtime_load: enforced
   maintenance_gate: enforced
+  task_admission_gate: enforced
   project_skills: instruction-only
+provider_security_policy:
+  temporary_home_xdg: required
+  environment_allowlist: required
+  secret_stripping: required
+  stdin_closed: required
+  target_path_isolation: required
+  timeout_output_limits: required
+  archive_cache_integrity: required
+  baseline_resource_limits: required
+  network_isolation: approval-required
+  enhanced_os_sandbox: best-effort
 ```
 
 These are minimum levels, not assumed platform facts. Every default platform must prove the required levels for its pinned adapter and harness version before release.
@@ -213,10 +238,26 @@ Catalog entries use stable IDs and describe:
 
 The release `workflow.lock` is committed and packaged with the CLI. `init` computes the exact transitive component closure required by the resolved profile and deterministically projects those unchanged locked identities and hashes into `.agent-workflow/workflow.lock`. It performs no version re-resolution and never queries a latest version.
 
-`sync` consumes only the existing project lock and cannot modify it. `upgrade` creates a candidate lock, fetches and verifies its content, generates a candidate IR, and presents supply-chain, routing, and file differences before approval.
+`sync` consumes only the existing project lock and cannot modify it. `upgrade` creates a candidate lock, fetches and verifies its content, generates a candidate IR, and presents supply-chain, routing, and file differences before approval. A release transition is legal only when the running release's compatibility metadata contains an exact directed edge from the current installed release to the requested target and identifies every required schema, artifact, and task-contract migration.
+
+```yaml
+schema_version: 1
+release: 0.1.1
+transitions:
+  - from: 0.1.0
+    to: 0.1.1
+    manifest_schemas: {from: 1, to: 1}
+    workflow_lock_schemas: {from: 1, to: 1}
+    integration_schemas: {from: 1, to: 1}
+    artifact_migration_id: identity-v1
+    migration_digest: sha256-value
+```
+
+Edges are directed; reverse support requires its own entry. Migration implementations and schemas are packaged and digest-bound to the running immutable release. An edge never implies compatibility with an unlisted patch, minor, or historical version.
 
 ```text
 current lock
+  -> compatibility edge validation
   -> candidate lock
   -> Provider fetch/verify
   -> candidate Desired State IR
@@ -240,6 +281,7 @@ targets:
   - path: .trellis/workflow.md
     ownership: overlay-managed
     merge_strategy: marked-block
+    mode_policy: preserve
     markers:
       begin: "<!-- agent-workflow:begin integrated-mode -->"
       end: "<!-- agent-workflow:end integrated-mode -->"
@@ -257,10 +299,13 @@ protected_paths:
   - .trellis/tasks/**
   - .trellis/workspace/**
   - specs/**
+  - .agent-workflow/local/**
   - .agent-workflow/transactions/**
 ```
 
-Artifact definitions may add restrictions but cannot relax global protection. Reconciler control-plane code retains explicit internal authority over `.agent-workflow/manifest.json`, `.agent-workflow/workflow.lock`, `.agent-workflow/reconcile.lock`, `.agent-workflow/maintenance.json`, and `.agent-workflow/transactions/**`; ordinary artifact definitions may not target those files.
+Artifact definitions may add restrictions but cannot relax global protection. Internal control-plane code retains explicit authority over `.agent-workflow/manifest.json`, `.agent-workflow/workflow.lock`, `.agent-workflow/reconcile.lock`, `.agent-workflow/runtime-state.lock`, `.agent-workflow/maintenance.json`, `.agent-workflow/local/**`, and `.agent-workflow/transactions/**`; ordinary artifact definitions may not target those files. Only the Task-state Service may use the local task locks or mutate integration state.
+
+The generated ignore overlay excludes `.agent-workflow/local/`, `.agent-workflow/transactions/`, both OS lock files, maintenance state, backups, and temporary files from Git. The Manifest, project workflow lock, and managed runtime catalog remain project-scoped files that may be committed. `doctor` blocks writes when ephemeral control state is tracked or when required project-scoped authority files are unexpectedly ignored.
 
 Additional rules:
 
@@ -270,6 +315,8 @@ Additional rules:
 - Marker pairs must be unique, non-nested, and stable.
 - `overlay-managed` is valid only with `marked-block`.
 - `managed` is valid only with whole-file replacement.
+- Every target declares `mode_policy: exact` or `preserve`. `exact` includes a normalized POSIX mode such as `0644` or `0755` and is valid only for whole-file `managed` or initial create-once output. Overlay-managed and adopted host files use `preserve`.
+- v0.1 manages only regular-file POSIX permission bits masked to `0777`; it does not manage owner, group, ACLs, xattrs, or platform-specific flags. Executable bits are part of the file-state contract.
 - `create-once-then-user-owned` is a creation policy that transitions to user ownership after the first successful creation.
 - `.trellis/spec/**` may be seeded only through `create-once-then-user-owned`; after creation it is never overwritten or drift-enforced by the pack.
 
@@ -290,9 +337,10 @@ Per-file records retain separate values:
 - `source_digest`;
 - `render_digest`;
 - `applied_file_hash`;
+- `applied_mode` or observed preserved mode;
 - `managed_block_hash` for overlays.
 
-Structured digests use normalized RFC 8785 JCS plus SHA-256. Rendered-file hashes use the actual UTF-8 bytes and are never conflated with structured-data digests. For overlay-managed files, drift decisions use only the managed block hash; the whole-file hash is observational and user edits outside markers do not cause a conflict.
+Structured digests use normalized RFC 8785 JCS plus SHA-256. Rendered-file hashes use the actual UTF-8 bytes and are never conflated with structured-data digests; v0.1 target artifacts must be valid UTF-8 regular files, so binary target materialization is unsupported. A file-state precondition combines path, regular-file type, byte hash, normalized POSIX mode, and non-symlink status. For overlay-managed files, content drift decisions use only the managed block hash and preserve the host mode; the whole-file hash and observed mode are informational unless a separately authorized policy says otherwise.
 
 ## 11. Desired State IR
 
@@ -308,7 +356,7 @@ The IR is serializable and versioned but is not a persistent authority. It inclu
 - render units and artifact definitions;
 - conflicts, warnings, blocked reasons, and validation evidence.
 
-All commands use the same Resolver and IR schema. `upgrade` uses a candidate lock to generate a candidate IR; read-only commands do not invent a separate interpretation.
+All lifecycle commands that evaluate workflow desired state use the same Resolver and IR schema. `upgrade` uses a candidate lock to generate a candidate IR; read-only lifecycle commands do not invent a separate interpretation. Task-state mutations do not create an IR and are governed by Section 21.
 
 ## 12. Target Manifest
 
@@ -331,9 +379,23 @@ The target manifest is stored at `.agent-workflow/manifest.json`.
 }
 ```
 
-`project_id` is generated once as a random UUID during the first committed `init`, then preserved by repository copies and clones unless the user performs a future explicit re-identification operation.
+`project_id` is a repository-lineage UUID. It is generated as candidate plan data for first init, becomes authoritative only when that init commits, and is intentionally preserved by repository copies and clones unless a future explicit lineage-fork operation assigns a new identity.
 
-Each applicable file record includes its repository-relative path, definition ID, ownership, source and render digests, applied hash, adopted baseline, and marker metadata. A create-once record remains present after ownership transitions:
+Each working copy also has non-Git local state at `.agent-workflow/local/workspace.json`:
+
+```json
+{
+  "schema_version": 1,
+  "project_id": "stable-project-uuid",
+  "workspace_instance_id": "clone-local-uuid"
+}
+```
+
+The workspace UUID is generated independently in each ordinary clone. The local file must be excluded from version control by a managed ignore marker. `doctor` blocks writes if it is tracked, malformed, or bound to a different lineage. Artifact definitions cannot manage this local state. Deliberately copying this ignored local file is outside the supported portability contract.
+
+Planning and dry-run do not create the local state. Before it exists, a first-init saved plan contains candidate lineage and workspace UUIDs plus a digest of the normalized target path and requires Manifest and local-state absence. The approved init transaction commits those identities for the same target. Every later saved plan binds both `project_id` and the persisted `workspace_instance_id`; applying it in another clone fails even when repository content and Manifest digests match.
+
+Each applicable file record includes its repository-relative path, definition ID, ownership, source and render digests, applied byte hash, applied or observed POSIX mode, adopted baseline, and marker metadata. A create-once record remains present after ownership transitions:
 
 ```json
 {
@@ -352,10 +414,10 @@ The manifest is written last by atomic rename and represents only a fully commit
 ### 13.1 Managed
 
 - Path absent from the manifest and target: initial creation is allowed.
-- Path recorded as managed and current hash equals the applied hash: an approved update is allowed.
+- Path recorded as managed and current byte hash, mode, type, and non-symlink state equal the applied file state: an approved update is allowed.
 - Path recorded as managed but missing: ownership drift; ordinary `sync` blocks.
 - Missing or drifted managed content requires an explicit `sync --repair` plan.
-- Deletion requires both prior managed ownership and a current hash equal to the applied hash.
+- Deletion requires both prior managed ownership and a current file state equal to the applied file state.
 - Retirement of managed content must be explicitly listed in an approved plan.
 
 ### 13.2 Overlay-managed
@@ -363,7 +425,7 @@ The manifest is written last by atomic rename and represents only a fully commit
 - Marker-external edits are allowed.
 - Marker-internal drift blocks ordinary synchronization.
 - Missing, duplicate, nested, malformed, or overlapping markers block.
-- Retiring an overlay removes only the matching managed block after a hash check; it never deletes the host file.
+- Retiring an overlay removes only the matching managed block after a managed-block hash and host-file precondition check; it never deletes the host file or changes the preserved host mode.
 
 ### 13.3 Adopted
 
@@ -391,6 +453,8 @@ When a valid manifest exists and its digest matches the project lock, `bootstrap
 
 Performs first installation or migration. It deterministically projects the release lock, resolves and renders the selected profile, and reconciles an approved plan. If a valid manifest already exists, `init` refuses and directs the user to `sync`. If an unfinished transaction exists, it refuses and directs the user to `recover`.
 
+Planning and `--dry-run` do not create `.agent-workflow/`, a lock file, local identity, maintenance marker, or any other target-project content. First apply uses the bootstrap lock handoff defined in Section 16.
+
 Existing Trellis, Spec Kit, or platform files are compared with staged initializer output. A pre-existing file whose bytes exactly match a candidate may be enrolled at the ownership class authorized by its artifact definition without rewriting it, but the plan must display that ownership change. `adopted` is reserved for an explicit observe-baseline migration policy that does not grant overwrite authority. Recognized blocks may become overlay-managed; unsafe differences block. Protected runtime state remains untouched.
 
 ### 14.3 `sync`
@@ -407,7 +471,9 @@ Creates an explicit repair plan for missing or drifted pack-managed content. It 
 
 Generates a candidate lock and candidate IR, fetches and verifies candidate content, shows supply-chain, routing, capability, license, and file changes, checks all active tasks, and reconciles only after explicit approval.
 
-`upgrade --to` may target an earlier trusted release. This is the supported post-commit rollback mechanism and always creates a new forward transaction. v0.1 does not expose `revert --transaction`.
+`upgrade --to` accepts only an immutable trusted release explicitly reachable from the installed release through `compatibility/releases.yaml`. Trust is necessary but not sufficient: a missing edge, unsupported Manifest or lock schema, absent artifact migration, or incompatible active task contract blocks before acquisition or apply. The command never invokes an older CLI against newer state.
+
+Targeting an allowed earlier release is the supported post-commit rollback mechanism and always creates a new forward transaction using compatibility logic shipped by the currently running release. v0.1 supports only same-schema targets explicitly listed in the compatibility matrix; the initial v0.1 release has no historical target until a later compatible release publishes such an edge. Arbitrary historical rollback is not promised, and v0.1 does not expose `revert --transaction`.
 
 ### 14.6 `doctor`
 
@@ -419,7 +485,19 @@ Runs deterministic policy, graph, golden-case, and rendered-adapter checks. It a
 
 ### 14.8 `recover`
 
-Acquires the same project writer lock as all other write commands. It supports validated `--resume` and `--rollback` only before the manifest commit point. It never guesses between them.
+Acquires the same bootstrap/project Reconciler locks required by the interrupted lifecycle transaction. It supports validated `--resume` and `--rollback` only before the Manifest commit point. It never guesses between them and does not use the Task-state Service's mutation path.
+
+### 14.9 `route decide`
+
+`agent-stack route decide --platform <id> --signals <stable-id,...>` is the sole issuer of executable Route Decisions. A model or user may propose candidate signal IDs and explanatory reasons, but cannot supply authority digests, matched rules, route, entry owner, decision identity, or approval state. The command validates signal IDs, takes a shared runtime-state gate lock for a consistent task snapshot, reads current project and task authorities, applies the compiled admission policy, and emits the decision. An implementation may use the exclusive gate when portable shared locking is unavailable. The command does not interpret natural language or mutate task state.
+
+### 14.10 `task admit|claim|transition|release|archive`
+
+These commands are the only supported mutation interface for integration state. `admit` validates a current Route Decision and obtains task-creation approval through the platform's enforced user-approval mechanism before atomically creating revision 1 of the selected mode branch. A decision may state that approval is required but can never self-assert that approval was satisfied. `claim`, `transition`, `release`, and `archive` require the expected revision plus command-specific preconditions and return the new revision. Platform wrappers must not expose a direct file-write or non-interactive approval bypass.
+
+### 14.11 `workspace register`
+
+A fresh clone contains the repository-lineage Manifest but not ignored local workspace state. `agent-stack workspace register` validates the Manifest and managed ignore marker, requires local-state absence, acquires the bootstrap and project locks in that order, and atomically creates a new `.agent-workflow/local/workspace.json`. It does not change the Manifest, workflow lock, artifacts, or tasks and refuses during maintenance or an unfinished transaction. Route issuance, task commands, and Reconciler-backed writes block until registration succeeds; `doctor` remains available and reports the required action.
 
 ## 15. Saved Reconcile Plans
 
@@ -427,7 +505,9 @@ The plan digest is SHA-256 over canonical plan content excluding the digest fiel
 
 ```yaml
 schema_version: 1
+transaction_id: prospective-transaction-uuid
 project_id: stable-project-uuid
+workspace_instance_id: clone-local-uuid
 manifest_generation: 6
 manifest_digest: sha256-value
 profile_digest: sha256-value
@@ -435,28 +515,45 @@ lock_digest: sha256-value
 artifact_bundle_digest: sha256-value
 pack_version: 0.1.0
 preconditions: []
-candidate_hashes: []
+candidate_file_states: []
 ```
+
+Each precondition and candidate file-state object binds one repository-relative path to existence, regular-file type, byte hash, normalized POSIX mode, and non-symlink status; overlay entries additionally bind marker and managed-block hashes. The plan never relies on parallel path, hash, and mode arrays.
 
 Applying a saved plan revalidates:
 
-- project identity;
+- repository-lineage and workspace-instance identities;
 - manifest generation and digest;
 - pack and schema versions;
-- every path precondition, file type, and non-symlink status;
+- prospective transaction identity and any bound provider-execution approvals;
+- every path precondition, byte hash, POSIX mode, file type, and non-symlink status;
 - reconstructability of candidate bytes from the locked cache;
 - platform capabilities;
 - active-task gate.
 
 `--dry-run` writes nothing to the target project. A plan is saved only when the user explicitly supplies `--out`; default output remains terminal-only.
 
+For first init only, the saved plan carries `project_id_precondition: absent`, `candidate_project_id`, `workspace_instance_precondition: absent`, `candidate_workspace_instance_id`, and `target_path_digest` instead of existing identities. These bootstrap fields are part of the canonical plan digest and cannot be rebound at apply time.
+
 ## 16. Single-writer, CAS, and Transaction Protocol
 
-All write commands and `recover` acquire an OS advisory lock at `.agent-workflow/reconcile.lock`. PID and timestamps stored in the lock file are diagnostic only; ownership is determined by the live OS lock.
+After a valid Manifest and local workspace identity exist, all Reconciler-backed lifecycle write commands and `recover` acquire the project OS advisory lock at `.agent-workflow/reconcile.lock`. Task-state commands use the separate protocol in Section 21. Fresh-clone workspace registration uses the bootstrap-to-project lock order without starting a Reconciler transaction. PID and timestamps stored in a lock file are diagnostic only; ownership is determined by the live OS lock.
 
-After acquiring the lock, the command revalidates manifest identity, active-task state, maintenance state, and plan baselines. Immediately before each rename or deletion, it performs a per-path compare-and-swap check of the preimage hash, file type, and non-symlink state. Any changed precondition stops the transaction without overwriting later edits.
+First init and recovery of an uncommitted first-init transaction use an overlapping bootstrap-lock handoff:
 
-Transaction journals live at `.agent-workflow/transactions/<transaction-id>.json` and record phase, original hashes, backups, applied files, candidate hashes, candidate manifest, rollback state, and diagnostics.
+1. Obtain explicit plan approval; planning and dry-run remain lock-free and perform no target writes.
+2. Acquire an out-of-tree OS advisory lock under the user cache, keyed by the canonical normalized target path and probed filesystem identity. Symlinked or ambiguous targets are rejected.
+3. Revalidate target identity, saved-plan bootstrap fields, absence of a valid Manifest, transaction state, ownership baselines, and active tasks.
+4. Create the minimum control directories and lock files, then acquire `.agent-workflow/reconcile.lock` while continuing to hold the bootstrap lock.
+5. Acquire `.agent-workflow/runtime-state.lock`, revalidate again, then atomically create the transaction journal before creating maintenance state.
+6. Create a maintenance marker bound to the transaction ID and journal digest, rescan active tasks, and only then begin apply.
+7. Hold the bootstrap lock, project lock, and runtime-state gate through file application, Manifest commit, maintenance cleanup, and journal finalization. Future lifecycle transactions use only the project lock plus the runtime-state gate while maintenance is active.
+
+A lifecycle process that sees no valid Manifest always enters through the bootstrap lock even if a project lock file or control directory already exists. This prevents a half-created control plane from changing lock selection. Empty preparation residue created before the journal is treated as uncommitted bootstrap residue and may be removed only while the bootstrap and project locks are held and all expected paths remain empty or match their known initial bytes.
+
+After acquiring the lock, the command revalidates manifest identity, active-task state, maintenance state, and plan baselines. Immediately before each rename, chmod, or deletion, it performs a per-path compare-and-swap check of the preimage byte hash, normalized POSIX mode, file type, and non-symlink state. Any changed precondition stops the transaction without overwriting later edits.
+
+Transaction journals live at `.agent-workflow/transactions/<transaction-id>.json` and record phase, original file states, backups, applied files, candidate file states, candidate Manifest, rollback state, diagnostics, and every directory first created by that transaction with its original absence precondition.
 
 ```text
 planned
@@ -468,23 +565,33 @@ planned
   -> complete
 ```
 
-Before `prepared`, the Reconciler verifies baselines, creates backups, records the candidate manifest and lock, and prepares replacement files on the same filesystem as their target. Files use temporary writes plus atomic rename. The project lock and managed artifacts are applied before the manifest. Manifest atomic rename is the logical commit point.
+Before `prepared`, the Reconciler verifies baselines, creates backups, records the candidate Manifest and workflow lock, and prepares replacement files on the same filesystem as their target. Files use temporary writes plus atomic rename. The project workflow lock and managed artifacts are applied before the Manifest. Manifest atomic rename is the logical commit point.
 
 Recovery rules:
 
+- `planned`: validated resume or cleanup of journal/control residue is allowed only after confirming that no candidate file state was applied.
 - `prepared`, `applying`, and `files_applied`: validated resume or CAS-protected rollback is allowed.
 - `manifest_committed` and `cleanup_pending`: only cleanup is allowed.
 - A committed transaction may be reversed only by a new `upgrade --to` or other future reconcile transaction.
-- Rollback may restore a backup only when the current file equals the candidate hash.
-- If the current file equals the original hash, that path is already restored.
-- If it equals neither, external modification occurred and automatic rollback stops with an explicit manual-recovery report.
+- Rollback may restore a backup only when the current complete file state equals the recorded candidate state.
+- If the current complete file state equals the original state, that path is already restored.
+- If it equals neither state, external modification occurred and automatic rollback stops with an explicit manual-recovery report.
+- Rollback removes a transaction-created directory only when it was absent at baseline, was recorded before creation, is still a real non-symlink directory, and is empty at cleanup time. Removal proceeds deepest-first; pre-existing or non-empty directories are never removed.
 - `last_transaction_id` and manifest generation determine whether a crash occurred after manifest commit but before journal update.
 
 v0.1 guarantees recovery from process termination under the documented filesystem assumptions. It uses atomic rename and best-effort flushes but does not guarantee ordering after sudden power loss, host failure, storage failure, or filesystems that do not honor the required semantics.
 
+### 16.1 Filesystem Preconditions
+
+Before any write, `doctor` or the command preflight probes the actual target filesystem for cross-process advisory-lock behavior, same-filesystem atomic replacement, regular-file and non-symlink checks, readable and settable POSIX mode bits, path case behavior, and Unicode-normalization collision behavior. Temporary replacement files and their targets must share a filesystem. Case-folded or normalized path collisions block even when the host would otherwise permit both names.
+
+The v0.1 write contract supports only Linux or WSL filesystems that pass these probes. A WSL path under `/mnt/*` is never assumed safe from its path alone; failed or indeterminate lock, rename, mode, or collision probes block write commands while leaving read-only diagnostics available. Network filesystems, cross-device replacements, and filesystems with unverified advisory locks are unsupported for mutation.
+
 ## 17. Maintenance and Active-task Gate
 
-After acquiring the writer lock, a write transaction creates `.agent-workflow/maintenance.json`, then scans active tasks again before apply. Generated platform adapters, runtime loaders, and the heavy router must check this marker.
+After acquiring the applicable writer locks, a write transaction also acquires the exclusive runtime-state gate lock, atomically persists the transaction journal for process-crash recovery, creates `.agent-workflow/maintenance.json`, and then scans active tasks again before apply. It holds the gate through maintenance cleanup. The marker contains the transaction ID, journal digest, plan digest, and candidate Manifest generation. Generated platform adapters, runtime loaders, and the heavy router must check this marker.
+
+If a marker references an existing unfinished transaction, `doctor` reports recovery-required. If the current Manifest's generation and `last_transaction_id` match the marker, the transaction is committed even when the journal update or journal itself is missing; `recover` may finish cleanup only. A marker matching neither a journal nor the current Manifest is corrupt or orphaned and is never silently ignored. Explicit orphan cleanup is allowed only while all applicable locks are held and after CAS validation proves that either the prior committed Manifest baseline or first-init bootstrap preconditions remain intact, no transaction temporary or backup files remain, and no candidate file state was applied; otherwise writes remain blocked for manual recovery.
 
 While maintenance exists:
 
@@ -523,7 +630,7 @@ maintenance block
   -> native-light
 ```
 
-`native-light` is an abstract owner bound to `sol-native` by `sol56-sdd`. `trellis-native` is explicit-only: mentioning Trellis in text is not an explicit request to use its workflow.
+`native-light` is an abstract owner with platform-specific bindings. In `sol56-sdd`, Codex binds it to `sol-native`, while Claude Code and OpenCode bind it to their platform-native lightweight planning behavior. `trellis-native` is explicit-only: mentioning Trellis in text is not an explicit request to use its workflow.
 
 Heavy signals use stable IDs shared by the adapter and router:
 
@@ -538,11 +645,18 @@ heavy_signals:
     - irreversible_or_destructive_operation
     - deployment_or_rollback_change
     - multi_session_coordination
+    - architecture_or_subsystem_change
+    - dependency_or_external_integration_change
+    - resource_or_large_data_risk
+    - reproducibility_provenance_governance
+    - acceptance_criteria_blocking_ambiguity
   compound:
     - all: [multi_module, contract_surface]
     - all: [brownfield_uncertainty, compatibility_risk]
     - all: [resource_sensitive, long_running_operation]
 ```
+
+The v0.1 admission policy preserves the effective heavy boundary of the legacy Router rather than intentionally shifting those cases to `native-light`. Legacy natural-language triggers are normalized into the stable IDs above, and the migration fixture records each mapping. Removing or weakening an existing trigger is a future policy migration that requires an ADR, a profile version change, and explicit old-versus-new routing golden cases.
 
 The Router consumes the same compiled admission policy as the adapter. It may revalidate decision identity, matched rule IDs, signal IDs, task state, pinned digests, and approval, but may not maintain a second independent signal list.
 
@@ -551,10 +665,21 @@ The Router consumes the same compiled admission policy as the adapter. It may re
 ```yaml
 schema_version: 1
 decision_id: decision-uuid
+decision_digest: sha256-value
 route: speckit-superpowers
+project_id: stable-project-uuid
+workspace_instance_id: clone-local-uuid
+manifest_generation: 7
+manifest_digest: sha256-value
 profile_digest: sha256-value
+lock_digest: sha256-value
+artifact_bundle_digest: sha256-value
 policy_digest: sha256-value
 platform: codex
+adapter_id: codex
+adapter_version: 1.0.0
+task_state_digest: sha256-value-or-null
+router_contract_version: 1
 entry_owner: heavy-development-router
 matched_rule_ids: []
 signals: []
@@ -562,7 +687,13 @@ reasons: []
 task_creation_approval: required
 ```
 
-Task-creation approval and implementation activation are separate gates. Activation belongs in `integration.yaml` after the heavy task exists.
+The issuer normalizes a decision payload excluding `decision_id` and `decision_digest`, computes its RFC 8785 JCS hash, derives `decision_id` as UUIDv5 in the fixed Agent Workflow Pack route namespace, and then computes `decision_digest` over the normalized payload plus derived ID. Identical authoritative inputs, candidate signals, and normalized reasons therefore produce the same identity. Explanatory reasons participate in the digest but never alter policy evaluation.
+
+`task_state_digest` covers the canonical active-task scan, active pointers, modes, lifecycle revisions, and pinned contract digests observed at decision time; it is null only when the project has no task-state inputs. Any intervening admission, transition, archive, or pointer change makes the decision stale.
+
+This decision is not authenticated by a secret signature. Its enforcement comes from independent reproducibility: every loader reads the current authorities, recomputes both identities, reruns the compiled policy over the supplied stable signal IDs, and requires exact agreement on route, matched rules, entry owner, task state, adapter version, and approval requirement. A hand-written, modified, stale, or copied decision cannot bypass the loader even if it is syntactically valid.
+
+Task-creation approval and implementation activation are separate gates. `task admit` records the approval actor, mechanism, time, Route Decision ID, and Route Decision digest in the newly created integration state. Implementation activation belongs in the heavy branch after the task exists.
 
 Conflicting explicit selection and pinned task mode blocks. Multiple active tasks with inconsistent pointers, missing decision identity, or mismatched profile/policy/contract digests also block.
 
@@ -584,6 +715,7 @@ Non-discoverability is an exposure boundary, not a filesystem or security bounda
 Before loading a runtime entry, the wrapper validates:
 
 - maintenance state;
+- Route Decision schema, identity, digest, and deterministic policy replay;
 - route and pinned mode;
 - current phase;
 - entry owner;
@@ -599,39 +731,87 @@ Discoverable leaf skills undergo transitive-reference validation. If their locke
 
 ## 21. Integration State Contract
 
-Every admitted heavy task stores `.trellis/tasks/<task>/integration.yaml` with the existing authority and canonical-artifact fields plus a pinned workflow contract.
+Every task admitted to `trellis-native` or `speckit-superpowers` stores `.trellis/tasks/<task>/integration.yaml`. The schema is a discriminated union keyed by `mode`; common fields pin the workflow contract and task lifecycle, while only the selected mode-specific branch is legal.
+
+Common fields are:
 
 ```yaml
-version: 1
-mode: speckit-superpowers
+schema_version: 1
+mode: trellis-native # or speckit-superpowers
 
 workflow_contract:
   version: 1
   profile_digest_at_admission: sha256-value
   lock_digest_at_admission: sha256-value
+  artifact_bundle_digest_at_admission: sha256-value
   policy_digest_at_admission: sha256-value
-  router_contract_version: 1
+  adapter_id: codex
+  adapter_version_at_admission: 1.0.0
+  route_contract_version: 1
 
-state:
-  phase: planning
+lifecycle:
+  status: active
   state_revision: 12
+  admitted_at: 2026-07-13T15:00:00Z
+  archived_at: null
+  blocked_reason: null
+  last_transition: {}
+
+admission:
+  route_decision_id: decision-uuid
+  route_decision_digest: sha256-value
+  approved_by: user-actor-id
+  approval_mechanism: platform-user-confirmation
+  approved_at: 2026-07-13T15:00:00Z
+```
+
+The `trellis-native` branch is deliberately small:
+
+```yaml
+mode: trellis-native
+trellis_native:
+  task_ref: .trellis/tasks/example
+```
+
+Trellis remains authoritative for its native internal phases and artifacts. The integration file exists only to pin mode, admission-time contract, and lifecycle so resume and upgrade gates do not have to infer them.
+
+The `speckit-superpowers` branch extends the common contract:
+
+```yaml
+mode: speckit-superpowers
+speckit_superpowers:
+  router_contract_version: 1
+  phase: implementing
   executor_claim:
     claim_id: claim-uuid
     executor: speckit-implement
     actor: actor-id
     claimed_at: 2026-07-13T16:00:00Z
     base_revision: 11
-  blocked_reason: null
-
-authority: {}
-canonical_artifacts: {}
-reference_only_artifacts: []
-last_transition: {}
+  authority:
+    active_feature: feature-id
+  canonical_artifacts: {}
+  reference_only_artifacts: []
+  completion_flags: {}
 ```
 
-The final schema retains `authority.active_feature`, `canonical_artifacts`, `reference_only_artifacts`, `last_transition`, completion flags, and `blocked_reason` from the current custom router contract.
+The heavy branch retains `authority.active_feature`, `canonical_artifacts`, `reference_only_artifacts`, phase, completion flags, and the structured executor claim from the current custom router contract. Common lifecycle retains `last_transition` and `blocked_reason` for both modes.
 
-Claims do not expire automatically. Claim creation rereads the current revision and fails on mismatch. Stale-claim recovery requires Git state, task artifacts, journals, and execution evidence; ambiguous ownership requires user direction.
+`lifecycle.status` is one of `active`, `blocked`, `completed`, or `archived`; `blocked` requires a non-null reason and still counts as unfinished for safety gates. An integration file is active for gating unless its status is `completed` or `archived`. Archiving records `archived_at` through the task-state mutation protocol; deleting the file is not an archive operation. Resume always uses the pinned mode and contract and never reclassifies the task.
+
+Task-state mutation uses this protocol:
+
+1. Resolve and validate the repository-relative task path and reject symlinks or a mode/schema mismatch.
+2. Acquire the exclusive project runtime-state gate lock, then the task-level OS advisory lock at `.agent-workflow/local/task-locks/<task-path-digest>.lock`.
+3. Recheck maintenance. For `admit`, require the integration path to remain absent and validate the task directory, Route Decision, and direct approval record. For every later command, read the complete integration file and verify its byte hash, expected `state_revision`, lifecycle status, mode, and command-specific preconditions.
+4. Write the complete next state to a temporary file in the task directory, recheck the absent or existing preimage and non-symlink path type, then atomically rename it.
+5. Increment `state_revision` exactly once and emit the prior and resulting state digests.
+
+The Reconciler takes the same runtime-state gate before installing maintenance and holds it through cleanup, so task admission or mutation cannot race the post-marker active-task rescan. Lock ordering is fixed: Reconciler lock before runtime-state gate; runtime-state gate before task lock. Task commands never acquire the Reconciler lock.
+
+For `speckit-superpowers`, `claim` is legal only in `phase: implementing` when `executor_claim` is null. It records the caller-supplied expected revision as `base_revision`; concurrent callers that observed the same revision serialize at the lock and all but the first fail CAS. `release` requires the exact claim ID and current revision. Phase transitions that require an executor reject an absent or foreign claim, and transitions out of implementation reject an unresolved claim.
+
+Claims do not expire automatically. Stale-claim recovery requires Git state, task artifacts, journals, and execution evidence; ambiguous ownership requires user direction and a separately audited forced-release transition.
 
 ## 22. Capability Model
 
@@ -645,6 +825,8 @@ enforced > instruction-only > unsupported
 - `instruction-only`: compliance depends on model instructions and cannot be described as a technical guarantee.
 - `unsupported`: the platform has no corresponding mechanism.
 
+`task_admission_gate: enforced` specifically requires a mechanism that distinguishes a direct user confirmation from model-generated command input and offers no unwrapped non-interactive task-creation path. A plain prompt instructing the model to ask first is only `instruction-only`.
+
 Adapter capability manifests bind claims to adapter and harness versions. Each manifest contains a platform ID, adapter version, a non-empty list of exact tested harness versions or closed tested version ranges, the measured level of each capability, the probe used by `doctor`, and the integration-evidence identifier. A range may be declared only when every boundary version and the project's compatibility policy have been tested.
 
 Profiles declare minimum levels. Materialization succeeds only when `actual >= required` for every selected platform. The strict `sol56-sdd` profile does not downgrade. Claude Code, Codex, and OpenCode all must pass version-bound integration tests at their required levels before they remain in `default_platforms` for v0.1.
@@ -652,6 +834,18 @@ Profiles declare minimum levels. Materialization succeeds only when `actual >= r
 `doctor` must probe actual harness configuration where possible. For example, a Codex project hook that requires user-level feature enablement and one-time approval is not `enforced` until the probe confirms both conditions.
 
 ## 23. Provider and Third-party Execution Security
+
+Provider execution security is independent of platform-adapter capabilities. Each control is assigned one policy level:
+
+- `required`: unavailable or failed enforcement blocks execution.
+- `approval-required`: unavailable enforcement blocks until the user reviews a concrete risk report and approves that one provider execution in that one saved plan.
+- `best-effort`: the CLI attempts and reports the control but does not block solely because it is unavailable.
+
+`sol56-sdd` requires temporary HOME/XDG directories, environment allowlisting, secret stripping, closed stdin, target-path isolation, time and output limits, archive/cache integrity, and baseline OS resource limits. Enforceable network isolation is approval-required. Enhanced namespace, seccomp, or container isolation is best-effort.
+
+Before any third-party process starts, the Renderer creates a canonical provider-execution plan containing the provider and command digests, project and workspace identities, workflow-lock digest, input digests, requested controls, measured isolation gaps, and a prospective transaction ID. An `approval-required` exception binds to that provider-plan digest, not to a final reconcile plan that cannot yet exist. The initializer result, approval record, sanitized diagnostics, and output digests then become inputs to the final reconcile plan, which still requires its separate apply approval.
+
+An approval is valid for exactly one provider-execution plan, provider version, workspace instance, and prospective transaction identity. It is not reusable by another render, target project, or changed command and cannot become a persistent silent downgrade. Planning with such approval still performs no target-project writes.
 
 Hash verification establishes identity, not safe execution. Third-party initializers execute with:
 
@@ -724,13 +918,20 @@ Golden cases use normalized signal IDs and cover:
 - maintenance taking priority over a pinned task;
 - explicit mode conflicting with an active task;
 - single-file security or schema changes entering heavy mode;
+- architecture or subsystem changes entering heavy mode;
+- new dependencies or external integrations entering heavy mode;
+- standalone resource or large-data risk entering heavy mode;
+- reproducibility, provenance, or governance requirements entering heavy mode;
+- acceptance criteria whose ambiguity blocks safe implementation entering heavy mode;
 - explicit Trellis-native intent versus merely mentioning Trellis;
 - direct `/speckit.implement` bypass attempts;
+- a model-authored or non-interactive task-creation approval bypass attempt;
 - leaf-skill gated-reference leakage;
 - instruction-only capability failing an enforced profile requirement;
 - native-light small fixes;
 - multi-module contract changes;
-- active heavy-task resume.
+- active heavy-task resume;
+- stale, copied, or field-tampered Route Decisions.
 
 Natural-language classification evaluation may be added later as a non-blocking eval suite.
 
@@ -738,7 +939,7 @@ Natural-language classification evaluation may be added later as a non-blocking 
 
 ### 26.1 Schema, Canonicalization, and Property Tests
 
-Test duplicate YAML keys, inheritance cycles, unknown fields, JCS digests, set sorting, Merkle inputs, path normalization, marker parsing, and manifest generations. Property/fuzz tests target path normalization, archive extraction, URL handling, and marker parsers.
+Test duplicate YAML keys, inheritance cycles, unknown fields, JCS digests, set sorting, Merkle inputs, path normalization, POSIX-mode normalization, marker parsing, release-compatibility edges, and manifest generations. Property/fuzz tests target path normalization, archive extraction, URL handling, and marker parsers.
 
 ### 26.2 Resolver and Policy Tests
 
@@ -750,11 +951,11 @@ Snapshot Claude Code, Codex, and OpenCode output. Verify route-gated runtime con
 
 ### 26.4 Reconciler Tests
 
-Use temporary projects to test every ownership class, protected paths, symlink refusal, CAS, repair, overlay retirement, saved-plan staleness, and no-write conflict behavior.
+Use temporary projects to test every ownership class, protected paths, symlink refusal, byte-and-mode CAS, executable-bit changes, repair, overlay retirement, transaction-created directory cleanup, fresh-clone workspace registration, cross-clone saved-plan refusal, saved-plan staleness, filesystem capability refusal, and no-write conflict behavior.
 
 ### 26.5 Crash and Concurrency Tests
 
-Inject process termination at each transaction phase. Test two CLI writers, cache contention, external modification immediately before rename, manifest-committed cleanup, and CAS rollback refusal.
+Inject process termination at each transaction phase. Test two CLI writers, two claimants at the same revision, task mutation against maintenance admission, cache contention, external byte or mode modification immediately before rename, manifest-committed cleanup, and CAS rollback refusal.
 
 ### 26.6 End-to-end Sequence
 
@@ -777,7 +978,9 @@ A sanitized, synthetic snapshot derived from the current sibling `workflow-pack`
 
 ## 27. Packaging and Release
 
-Build and test both wheel and sdist. Installation tests run from the built artifacts, not only from a source checkout. Package-data tests verify inclusion and exact digests of profiles, catalogs, schemas, artifact definitions, overlays, custom skills, licenses, and notices.
+Build and test both wheel and sdist. Installation tests run from the built artifacts, not only from a source checkout. Package-data tests verify inclusion and exact digests of profiles, catalogs, schemas, compatibility metadata, artifact definitions, overlays, custom skills, licenses, and notices.
+
+The sdist contains the same vendored runtime sources as the wheel. Release CI builds both artifacts in the `uv.lock`-controlled build environment and verifies that the wheel metadata has an empty external runtime `Requires-Dist` set. Build-system dependencies remain build-time concerns and are not represented as consumer runtime reproducibility.
 
 The canonical end-user `uvx` command installs the exact wheel asset of a verified immutable GitHub release. Release metadata binds that immutable release and asset hash to the actual full 40-hex source commit SHA. A source-audit command may use the full commit SHA directly, but release acceptance must execute the built wheel and sdist rather than relying only on a source checkout. A movable ordinary tag is never a trust anchor.
 
@@ -800,13 +1003,15 @@ origin:
   component: trellis
   commit: full-commit-sha
   upstream_path: source/path
-  license: AGPL-3.0
+  license_expression: AGPL-3.0-only
   modified: true
 ```
 
-This applies to Trellis overlays, projected skills, agents, commands, hooks, and initializer-generated files when they contain copyrightable upstream content. Superpowers and Spec Kit content retains MIT notices; Trellis-derived content retains applicable AGPL-3.0 notices and modification statements.
+This applies to Trellis overlays, projected skills, agents, commands, hooks, and initializer-generated files when they contain copyrightable upstream content. At the upstream commits reviewed for v0.1, Superpowers and Spec Kit use the SPDX expression `MIT`, while Trellis uses `AGPL-3.0-only`; release automation must revalidate the exact pinned upstream license text and metadata rather than inheriting these values by component name. Derived content retains the applicable full notice and modification statement.
 
 `THIRD_PARTY_NOTICES.md` is generated from lock and provenance metadata and tested for completeness. Target-project materialization includes the notices required for the third-party content actually projected there.
+
+Vendored Python runtime code is third-party content, not first-party merely because it is packaged inside the wheel. Each vendored file maps to an exact source artifact, version, source hash, SPDX expression, modification status, and full license text.
 
 ## 29. Legacy Migration Requirements
 
@@ -821,7 +1026,7 @@ The current custom skills are migration inputs, not automatically valid release 
 
 ## 30. v0.1 Acceptance Criteria
 
-- **AC-01:** A clean WSL/Linux target initializes through `uvx` from the exact wheel asset of a verified immutable release whose metadata identifies the full source commit SHA and asset hash; the corresponding sdist passes the same installation scenario.
+- **AC-01:** A clean WSL/Linux target initializes through `uvx` from the exact self-contained wheel asset of a verified immutable release whose metadata identifies the full source commit SHA and asset hash; the corresponding sdist builds the same self-contained runtime and passes the same installation scenario.
 - **AC-02:** `sol56-sdd` materializes Claude Code, Codex, and OpenCode only when each satisfies the profile's strict capability requirements.
 - **AC-03:** `doctor` and deterministic routing tests pass immediately after initialization.
 - **AC-04:** A second `sync` produces a verified no-op and performs no target writes.
@@ -838,6 +1043,12 @@ The current custom skills are migration inputs, not automatically valid release 
 - **AC-15:** Provenance, full licenses, notices, lock hashes, and target notices are complete for every projected third-party artifact.
 - **AC-16:** JSON output, exit codes, and redaction pass their versioned contract tests.
 - **AC-17:** The legacy `workflow-pack` migration fixture retains all protected Trellis and Spec Kit runtime state.
+- **AC-18:** `upgrade --to` rejects every target absent from the explicit directed compatibility matrix and never launches an older CLI against current state.
+- **AC-19:** File-state CAS detects byte, type, symlink, and POSIX-mode changes, including executable-bit drift.
+- **AC-20:** Write commands refuse filesystems that fail advisory-lock, atomic-replace, mode, or path-collision probes; `/mnt/*` receives no implicit exemption.
+- **AC-21:** Concurrent executor claims at one base revision result in exactly one successful atomic state transition.
+- **AC-22:** A model-generated Route Decision or command flag cannot satisfy the enforced user approval required by `task admit`.
+- **AC-23:** A fresh clone must register a new local workspace identity before writes, and a saved plan from another clone is rejected by default.
 
 ## 31. Implementation Decomposition
 
@@ -846,7 +1057,7 @@ The approved design should be implemented through separate feature specs, in thi
 1. **Core schemas and Resolver** — profiles, catalog, locks, canonicalization, artifact definitions, IR, policy graph, and diagnostics.
 2. **Providers and secure cache** — acquisition, isolation, verification, extraction limits, provenance, and cache concurrency.
 3. **Renderer and Reconciler** — staging, ownership, plans, OS lock, CAS, transactions, repair, and recovery.
-4. **Routing and platform adapters** — runtime catalog, loaders, capability probes, route decisions, maintenance, and platform golden output.
+4. **Routing, task state, and platform adapters** — runtime catalog, loaders, capability probes, Route Decisions, integration union, task-state mutation/claims, maintenance coordination, and platform golden output.
 5. **Lifecycle, packaging, and release** — CLI commands, JSON contracts, upgrade flow, E2E tests, artifact builds, immutable trust anchors, and notices.
 
 Each feature spec must preserve the authority boundaries and acceptance criteria in this document. No feature spec may introduce a second planner, executor, route-policy source, ownership source, or task-state source.
@@ -859,4 +1070,4 @@ Each feature spec must preserve the authority boundaries and acceptance criteria
 - Upstream platform and Trellis templates may change paths or hook behavior; adapter and harness versions therefore remain locked and tested.
 - Trellis-derived overlays and generated content require artifact-level provenance and license handling rather than a repository-wide assumption.
 
-No blocking product decision remains in this design. Implementation planning begins only after the user reviews and approves this written spec.
+All written-spec review blockers have been incorporated. The document is revised and self-reviewed but remains awaiting explicit user approval; implementation planning is prohibited until that approval.
