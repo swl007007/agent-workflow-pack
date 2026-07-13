@@ -1,7 +1,7 @@
 # Agent Workflow Pack v0.1 Design
 
-**Status:** Approved with required errata
-**Review gate:** Required errata applied; awaiting diff-only verification before unconditional approval
+**Status:** Changes required
+**Review gate:** Incremental protocol errata applied; awaiting reviewer confirmation before approval or implementation decomposition
 **Date:** 2026-07-13  
 **Target:** New sibling repository `agent-workflow-pack`  
 **Initial profile:** `sol56-sdd`  
@@ -38,6 +38,7 @@ The existing sibling `workflow-pack` directory is a read-only migration source f
 - A public `revert --transaction` command in v0.1.
 - Treating natural-language routing evaluation as a deterministic release gate.
 - A resident daemon, background service, or mutable globally shared CLI installation.
+- Treating a same-user-writable checkout, including its project launcher, as a hostile-code execution sandbox or trusted verification root.
 - Providing legal advice; the repository supplies engineering provenance and notices only.
 
 ## 4. Core Authority Model
@@ -65,6 +66,8 @@ A profile may select a versioned artifact policy, but it cannot expand the paths
 Task transaction journals are recovery evidence, and `.agent-workflow/local/task-outbox/**` is a non-authoritative delivery queue. Neither may independently change task lifecycle, approval-consumption state, routing, ownership, or acceptance; those outcomes must already be committed in the authority named above.
 
 After cross-ownership validation, the Task-state Service receives temporary transaction-scoped CAS authority over the current task's integration file, task-shell move, and the exact expanded Trellis metadata candidates recorded in that task journal. This exception does not transfer ownership, authorize pack-managed content, or permit writes to any unplanned path.
+
+Ordinary approval-replay transitions and task-outbox mutations are Task-state-Service-only. The only additional local-state writers are the approved first-init Reconciler transaction, the workspace-registration transaction, and an explicitly authorized compatibility-edge migration. Those exceptions are limited to the exact workspace, replay-ledger, and outbox paths and candidate states recorded in their own journals; they do not grant general artifact ownership or permit deletion-and-recreation as a migration strategy.
 
 ## 5. Planned Repository Structure
 
@@ -359,6 +362,8 @@ transitions:
 
 Edges are directed; reverse support requires its own entry. Each edge binds the target logical Release Identity and expected trust-policy, workflow-lock, artifact, schema, migration, and launcher bundles, but never a source commit, its own compatibility-bundle digest, or a distribution-container URL or hash; `target_release.version` must equal `to`. It also declares the from/to schema versions for every persistent project and workspace state domain used by the transition. A changed workspace, replay-ledger, or task-outbox schema requires an explicit migration ID and digest; an unfinished task transaction pins its original schema versions and blocks an upgrade whose edge cannot continue or migrate them. No transition may reset or silently recreate local state to avoid a migration. The detached manifest independently binds the source commit and the digest of the compatibility bundle containing the edge. An edge never implies compatibility with an unlisted patch, minor, or historical version.
 
+Compatibility-edge local-state migration runs only inside the approved lifecycle transaction while the Reconciler lock and exclusive runtime-state gate are held. Planning enumerates the exact `workspace.json`, `approval-replay.json`, and existing task-outbox item paths, rejects symlinks or unexpected additions, and derives each candidate through the verified migration identified by the edge. The lifecycle journal records every local path's schema ID/version, complete byte-and-mode preimage, candidate bytes and digest, and original absence or existence condition. Local candidates are applied before Manifest commit with per-path CAS. Before that commit, rollback restores every matching preimage or removes only a transaction-created candidate whose recorded precondition was absence; after commit, the new Manifest establishes the new local-state schema contract and recovery may only finish cleanup. A migration failure, partial path set, unexpected concurrent state, or candidate validation error blocks the upgrade and may never be converted into an empty ledger, empty outbox, or newly registered workspace.
+
 The default `upgrade` target is the release of the exact CLI currently executing the command. For a forward upgrade launched from an older project runtime, `--to` is only a trust-policy-bound candidate locator: the committed runtime verifies the target detached manifest, downloads the exact wheel named there, checks its full byte hash and size, and only then reads static identity and compatibility metadata from the verified archive. The candidate must contain the complete installed-to-candidate edge and describe itself as `target_release`; its internal Release Identity and every parsed bundle must match both the detached manifest and that edge before candidate code executes. For a supported transition to an earlier release, the currently executing newer runtime must contain the complete edge and performs the migration without executing the older CLI against newer state.
 
 ```text
@@ -499,8 +504,14 @@ The target manifest is stored at `.agent-workflow/manifest.json`.
   "profile_digest": "sha256-value",
   "lock_digest": "sha256-value",
   "artifact_bundle_digest": "sha256-value",
+  "local_state_schema_contract": {
+    "workspace": 1,
+    "approval_replay": 1,
+    "task_outbox": 1
+  },
   "platforms": ["claude", "codex", "opencode"],
   "last_transaction_id": "transaction-uuid",
+  "last_transaction_binding_digest": "sha256-value",
   "previous_manifest_digest": "sha256-value",
   "files": []
 }
@@ -522,6 +533,8 @@ Each working copy also has non-Git local state at `.agent-workflow/local/workspa
 The workspace UUID is generated independently in each ordinary clone. The local file must be excluded from version control by a managed ignore marker. `doctor` blocks writes if it is tracked, malformed, bound to a different lineage, or not accompanied by the valid replay ledger created in the same registration transaction. Artifact definitions cannot manage this local state. Deliberately copying this ignored local file is outside the supported portability contract.
 
 Planning and dry-run do not create the local state. Before it exists, a first-init saved plan contains candidate lineage and workspace UUIDs, an empty replay-ledger candidate, and a digest of the normalized target path and requires Manifest and both local-state files to be absent. The approved init transaction applies `workspace.json` and the empty ledger as one recoverable candidate pair before Manifest commit; the Manifest commit makes the pair authoritative, and pre-commit rollback removes both only under their original-absence and candidate-byte CAS. Every later saved plan binds both `project_id` and the persisted `workspace_instance_id`; applying it in another clone fails even when repository content and Manifest digests match.
+
+The Manifest's `local_state_schema_contract` records the schema versions required by the committed release for workspace state, approval replay, and task outbox items. It does not make ignored local files pack-managed; it establishes the version contract that registration, the Task-state Service, `doctor`, and compatibility migrations must enforce. `last_transaction_binding_digest` copies the committing transaction's immutable journal binding so post-commit cleanup can be recognized even if the mutable journal was not advanced or was already removed.
 
 Each applicable file record includes its repository-relative path, definition ID, ownership, source and render digests, applied byte hash, applied or observed POSIX mode, adopted baseline, and marker metadata. A create-once record remains present after ownership transitions:
 
@@ -710,14 +723,29 @@ First init and recovery of an uncommitted first-init transaction use an overlapp
 3. Revalidate target identity, saved-plan bootstrap fields, absence of a valid Manifest, transaction state, ownership baselines, and active tasks.
 4. Create the minimum control directories and lock files, then acquire `.agent-workflow/reconcile.lock` while continuing to hold the bootstrap lock.
 5. Acquire `.agent-workflow/runtime-state.lock`, revalidate again, atomically create the transaction journal as `planned`, advance it to `probing`, and execute the filesystem write probe before creating maintenance or applying authoritative state.
-6. CAS-clean all probe paths, persist the successful evidence, advance the journal, then create a maintenance marker bound to the transaction ID and journal digest. Rescan active tasks and only then begin apply.
+6. CAS-clean all probe paths, persist the successful evidence, advance the journal, then create a maintenance marker bound to the transaction ID and immutable `journal_binding_digest`. Rescan active tasks and only then begin apply.
 7. Hold the bootstrap lock, project lock, and runtime-state gate through probing, file application, Manifest commit, maintenance cleanup, and journal finalization. Future lifecycle transactions use only the project lock plus the runtime-state gate while maintenance is active.
 
 A lifecycle process that sees no valid Manifest always enters through the bootstrap lock even if a project lock file or control directory already exists. This prevents a half-created control plane from changing lock selection. Empty preparation residue created before the journal is treated as uncommitted bootstrap residue and may be removed only while the bootstrap and project locks are held and all expected paths remain empty or match their known initial bytes.
 
 After acquiring the lock, the command revalidates manifest identity, active-task state, maintenance state, and plan baselines. Immediately before each rename, chmod, or deletion, it performs a per-path compare-and-swap check of the preimage byte hash, normalized POSIX mode, file type, and non-symlink state. Any changed precondition stops the transaction without overwriting later edits.
 
-Transaction journals live at `.agent-workflow/transactions/<transaction-id>.json` and record phase, original file states, backups, applied files, candidate file states, candidate Manifest, rollback state, diagnostics, and every directory first created by that transaction with its original absence precondition.
+Transaction journals live at `.agent-workflow/transactions/<transaction-id>.json` and record phase, original file states, backups, applied files, candidate file states, candidate Manifest, rollback state, diagnostics, and every directory first created by that transaction with its original absence precondition. Their immutable binding header is hashed as:
+
+```text
+journal_binding_digest = SHA256(JCS({
+  transaction_id,
+  operation,
+  project_id,
+  workspace_instance_id,
+  plan_digest,
+  baseline_manifest_digest,
+  candidate_manifest_generation,
+  recovery_runtime
+}))
+```
+
+For first init, `project_id` and `workspace_instance_id` are the approved candidate identities and `baseline_manifest_digest` is the schema-defined canonical null value. The immutable header is written before maintenance and never changes. Mutable journal fields such as `phase`, applied-file lists, diagnostics, retries, and rollback progress are excluded from `journal_binding_digest`; every journal rewrite must preserve the header byte-for-byte and revalidate its digest.
 
 ```text
 planned
@@ -743,7 +771,7 @@ Recovery rules:
 - If the current complete file state equals the original state, that path is already restored.
 - If it equals neither state, external modification occurred and automatic rollback stops with an explicit manual-recovery report.
 - Rollback removes a transaction-created directory only when it was absent at baseline, was recorded before creation, is still a real non-symlink directory, and is empty at cleanup time. Removal proceeds deepest-first; pre-existing or non-empty directories are never removed.
-- `last_transaction_id` and manifest generation determine whether a crash occurred after manifest commit but before journal update.
+- `last_transaction_id`, `last_transaction_binding_digest`, and Manifest generation determine whether a crash occurred after Manifest commit but before journal update.
 
 v0.1 guarantees recovery from process termination under the documented filesystem assumptions. It uses atomic rename and best-effort flushes but does not guarantee ordering after sudden power loss, host failure, storage failure, or filesystems that do not honor the required semantics.
 
@@ -759,9 +787,9 @@ The v0.1 write contract supports only Linux or WSL filesystems that pass these p
 
 ## 17. Maintenance and Active-task Gate
 
-After acquiring the applicable writer locks, a write transaction also acquires the exclusive runtime-state gate lock, atomically persists the transaction journal for process-crash recovery, creates `.agent-workflow/maintenance.json`, and then scans active tasks again before apply. It holds the gate through maintenance cleanup. The marker contains the transaction ID, journal digest, plan digest, and candidate Manifest generation. Generated platform adapters, runtime loaders, and the heavy router must check this marker.
+After acquiring the applicable writer locks, a write transaction also acquires the exclusive runtime-state gate lock, atomically persists the transaction journal for process-crash recovery, creates `.agent-workflow/maintenance.json`, and then scans active tasks again before apply. It holds the gate through maintenance cleanup. The marker contains the transaction ID, `journal_binding_digest`, plan digest, and candidate Manifest generation. It validates only against the immutable journal header defined in Section 16; journal phase and other mutable fields may advance without rewriting the marker. Generated platform adapters, runtime loaders, and the heavy router must check this marker.
 
-If a marker references an existing unfinished transaction, `doctor` reports recovery-required. If the current Manifest's generation and `last_transaction_id` match the marker, the transaction is committed even when the journal update or journal itself is missing; `recover` may finish cleanup only. A marker matching neither a journal nor the current Manifest is corrupt or orphaned and is never silently ignored. Explicit orphan cleanup is allowed only while all applicable locks are held and after CAS validation proves that either the prior committed Manifest baseline or first-init bootstrap preconditions remain intact, no transaction temporary or backup files remain, and no candidate file state was applied; otherwise writes remain blocked for manual recovery.
+If a marker references an existing unfinished transaction, `doctor` recomputes the immutable header digest and reports recovery-required. If the current Manifest's generation, `last_transaction_id`, and `last_transaction_binding_digest` match the marker, the transaction is committed even when a mutable journal update or the journal itself is missing; `recover` may finish cleanup only. A marker whose immutable binding matches neither an existing journal nor those committed Manifest fields is corrupt or orphaned and is never silently ignored. Explicit orphan cleanup is allowed only while all applicable locks are held and after CAS validation proves that either the prior committed Manifest baseline or first-init bootstrap preconditions remain intact, no transaction temporary or backup files remain, and no candidate file state was applied; otherwise writes remain blocked for manual recovery.
 
 While maintenance exists:
 
@@ -914,7 +942,7 @@ verifier_receipt: opaque-platform-verifier-value
 
 The adapter capability manifest binds verifier ID/version to exact supported harness versions and proves that `actor.id`, timestamps, challenge, and receipt come from the confirmation mechanism rather than model-authored CLI input. `task admit` requires `kind: direct-human`, verifies the profile TTL and clock-skew limits, and rejects an unsupported verifier version. Existing unfinished admission journals pin their verifier version and recovery runtime; an upgrade that cannot continue that verifier contract is blocked. New verifier versions apply only to new approvals.
 
-Replay detection uses `.agent-workflow/local/approval-replay.json`, written only by the Task-state Service under the runtime-state gate. Its independent schema is:
+Replay detection uses `.agent-workflow/local/approval-replay.json`. Ordinary reservation and consumption transitions are written only by the Task-state Service under the runtime-state gate. The approved first-init transaction may create the canonical empty ledger, workspace registration may create the same empty ledger as part of its paired commit, and a verified compatibility-edge migration may transform the exact existing ledger under the Reconciler protocol in Sections 8 and 16. No other writer or delete-and-recreate path is permitted. Its independent schema is:
 
 ```json
 {
@@ -947,7 +975,7 @@ proof_key = SHA256(JCS({
 
 Each key has exactly one monotonic state path: absent to `reserved` to `consumed`. Its value binds one `task_transaction_id`; an existing entry may never be rebound, deleted, or reset. The normal admission path persists a planned journal containing `proof_key`, complete proof identity, and successful `validated_at`, then inserts the absent ledger entry as `reserved` only while the proof is within its TTL and clock-skew policy. A reservation held by another transaction or any consumed tombstone rejects the proof.
 
-Once reservation succeeds, validated resume of that same journal and transaction may continue after proof expiry; expiry cannot strand pre- or post-commit recovery. If a crash leaves the planned journal durable but the ledger entry absent, resume may complete the reservation only for that same transaction when the journal proves the original validation occurred within TTL and the complete proof still matches the recorded digest. Rollback from this window writes a `consumed` tombstone bound to that transaction instead of making the proof reusable. Commit or later rollback of a reserved transaction also changes it to `consumed` by CAS and records `consumed_at`. A fresh clone cannot replay the proof because the workspace identity differs. Missing or corrupt ledger state after a committed workspace registration, duplicated keys, illegal transitions, expired first-use attempts, or conflicting bindings block admission.
+Once reservation succeeds, validated resume of that same journal and transaction may continue after proof expiry; expiry cannot strand pre- or post-commit recovery. If a crash leaves the planned journal durable but the ledger entry absent, resume may complete the reservation only for that same transaction when the journal proves the original validation occurred within TTL and the complete proof still matches the recorded digest. Rollback from this window preserves the sole legal `absent -> reserved -> consumed` path: it first CAS-creates the `reserved` entry bound to that same transaction from the journal's recorded validation, then separately CAS-transitions it to a `consumed` tombstone and records `consumed_at`. A crash between those two writes resumes from the same journal and may only complete consumption. Commit or later rollback of an already reserved transaction likewise changes it to `consumed` by CAS. A fresh clone cannot replay the proof because the workspace identity differs. Missing or corrupt ledger state after a committed workspace registration, duplicated keys, illegal transitions, expired first-use attempts, or conflicting bindings block admission.
 
 Conflicting explicit selection and pinned task mode blocks. Multiple active tasks with inconsistent pointers, missing decision identity, or mismatched profile/policy/contract digests also block.
 
@@ -987,15 +1015,41 @@ The descriptor is a managed artifact recorded in the Manifest and includes at le
 }
 ```
 
-The descriptor is rendered only from a detached manifest already verified under the packaged trust policy. v0.1 uses one cold-cache protocol: descriptor-hash-bound wheel bootstrap. The generated launcher embeds literal constants for the descriptor digest, Release Identity, detached-manifest digest, exact immutable wheel URL, wheel SHA-256, and launcher contract version. Those substitutions and their renderer version participate in the launcher bundle and byte hash. Launcher and descriptor replacement is one compatibility-checked managed change; editing either side independently produces a mismatch.
+The descriptor is rendered only from a detached manifest already verified under the packaged trust policy. v0.1 uses one cold-cache protocol and one pre-wheel authority: the launcher file itself. It embeds literal constants for Release Identity, detached-manifest digest, exact immutable wheel URL, wheel SHA-256, supported uv policy, supported local-Python range, the complete uv argument contract, and launcher contract version. It does not embed or pre-validate the descriptor digest. The descriptor is a post-wheel managed input that the pinned CLI validates before ordinary command dispatch.
 
-The pre-wheel launcher depends only on POSIX `sh`, a release-tested `uv`/`uvx` installation, and GNU-compatible `sha256sum`. It does not parse descriptor, Manifest, transaction-journal, or detached-manifest JSON and does not use `grep`, `sed`, `awk`, `jq`, `curl`, or a mutable PATH-resolved `agent-stack` as a data parser or trust source. It locates the repository root from its own real non-symlink path, validates regular-file and non-symlink types, verifies the complete descriptor byte hash against its embedded digest, checks only the mechanically testable launcher prerequisites, and invokes the exact embedded wheel URL through uv's hash-bound direct-wheel form. A cache miss may download only that URL and succeeds only when the downloaded wheel matches the embedded SHA-256; there is no latest-version, alternate-index, source-checkout, or global-install fallback.
+Detached-manifest-derived substitutions and their renderer version participate in the rendered launcher's `render_digest`, `applied_file_hash`, and `distribution_render_digest`, but are excluded from `launcher_bundle_digest`. The launcher bundle contains only release-neutral templates, schemas, and verifier logic. Release CI rejects a launcher bundle containing wheel identity, detached-manifest identity, rendered descriptor bytes, or rendered launcher substitutions.
 
-The exact descriptor/launcher wheel identity is sufficient only to bootstrap already hash-pinned code; it is not full release authorization. Immediately after the wheel starts and before it dispatches `workspace register`, diagnostics, recovery, routing, task-state, lifecycle, or any provider/network operation, the CLI uses its packaged canonical trust-policy bytes to derive the detached-manifest locator, verifies the pinned GitHub repository and immutable release, parses the manifest, and requires its digest, wheel identity, source commit, Release Identity, bundle roots, launcher and descriptor file records, project Manifest, and command eligibility to agree. Failure performs no target write and no workflow-component download. The cached detached manifest is therefore an optimization, not a cold-start prerequisite.
+The v0.1 pre-wheel prerequisites are POSIX `sh`, POSIX `env`, a release-tested `uv`/`uvx` binary, and an already installed compatible Python interpreter satisfying `>=3.11,<3.15`. The launcher does not require pre-wheel JSON parsing or a separate `sha256sum`: uv verifies the direct-wheel hash, and the pinned Python CLI performs all project-file hashing after startup. The selected uv binary and local Python are user-provided trusted bootstrap prerequisites whose resolved paths and versions are reported by `doctor`; v0.1 does not supply or download Python.
 
-The shell layer never selects `committed` versus `candidate` by parsing a transaction journal. The first hash-pinned CLI validates that journal against the committed/candidate allowlist and either continues under its permitted role or re-executes the other exact manifest-authorized runtime before command dispatch. Offline cache miss, manifest-verification failure, missing or unsupported bootstrap tools, wheel hash failure, Release Identity mismatch, source-commit mismatch, or pack-version mismatch returns a stable runtime-bootstrap error and fails closed.
+The launcher discards the inherited environment and constructs a fixed allowlist containing only the resolved bootstrap `PATH`, a cache-side non-project `HOME`, `LANG=C.UTF-8`, `LC_ALL=C.UTF-8`, and `TZ=UTC`. It inherits no `UV_*`, index, proxy-credential, Python-selection, virtual-environment, `.env`, or project variables. Its uv invocation is schema-fixed and equivalent to:
 
-A fresh clone receives the committed launcher, descriptor, Manifest, and workflow lock even though local state is absent. The launcher therefore permits `workspace register` and read-only diagnostics before local registration; other runtime and write commands remain blocked.
+```text
+env -i \
+  PATH=<bootstrap-path> \
+  HOME=<cache-side-bootstrap-home> \
+  LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC \
+  <absolute-uvx-path> \
+  --isolated \
+  --no-config \
+  --no-env-file \
+  --no-index \
+  --keyring-provider disabled \
+  --no-sources \
+  --no-build \
+  --no-python-downloads \
+  --python <absolute-compatible-python-path> \
+  --cache-dir <controlled-cache-root> \
+  --from '<wheel-url>#sha256=<wheel-sha256>' \
+  agent-stack --bootstrap-project <repo-root> <command...>
+```
+
+The launcher resolves one release-supported uv executable and one compatible local Python executable before clearing the environment, validates their versions, converts both to absolute non-symlink paths, and then invokes only those paths. The exact argument order, supported uv version range, environment keys, bootstrap search/path derivation rules, direct-wheel URL, and hash are part of the launcher contract and rendered-launcher digest. `--isolated` creates an isolated tool environment rather than reusing a globally installed same-name tool; `--no-config` and `--no-env-file` ignore `uv.toml`, `pyproject.toml`, and `.env`; `--no-index`, `--no-sources`, and the dependency-free wheel prevent alternate package resolution; `--no-python-downloads` makes absence of compatible local Python a fail-closed bootstrap error. A cache miss may download only the hash-bound direct wheel and its allowed redirects. No Python distribution, registry package, build dependency, or second tool artifact may be fetched.
+
+The exact launcher wheel identity is sufficient only to bootstrap already hash-pinned code; it is not full release authorization. Immediately after the wheel starts and before it dispatches `workspace register`, diagnostics, recovery, routing, task-state, lifecycle, or any provider/network operation, the CLI uses its packaged canonical trust-policy bytes to derive the detached-manifest locator, verifies the pinned GitHub repository and immutable release, parses the project Manifest, descriptor, and any transaction journal, and requires all applicable release, source, bundle, file-record, and command authorities to agree. Failure performs no target write and no workflow-component download. The cached detached manifest is therefore an optimization, not a cold-start prerequisite.
+
+Launcher replacement is a single-file atomic rename and is the only pre-wheel bootstrap switch. Descriptor replacement is a separate managed rename that cannot prevent the shell from starting the wheel. With no unfinished transaction, the started pinned CLI requires both files to match the committed Manifest. With an unfinished transaction, the pinned CLI accepts the launcher and descriptor independently only when each complete byte-and-mode state equals either the journal-recorded preimage or candidate state, permits only diagnostics and the matching `recover`, and selects or re-executes only the committed/candidate runtime allowlisted by the journal. Therefore old-launcher/new-descriptor and new-launcher/old-descriptor crash states remain recoverable; an unrecorded third state fails closed.
+
+A fresh clone receives the committed launcher, descriptor, Manifest, and workflow lock even though local state is absent. After release verification, the pinned CLI permits `workspace register` and read-only diagnostics before local registration; other runtime and write commands remain blocked.
 
 Every Reconciler or task transaction journal records only a non-authoritative runtime reference before its first target mutation:
 
@@ -1007,13 +1061,13 @@ recovery_runtime:
   launcher_contract_version: 1
 ```
 
-The journal may not contain a wheel URL, asset hash, repository, tag, or trust-policy override. The launcher accepts `runtime_role: committed` only when the reference equals the Release Identity and detached-manifest digest in the committed project Manifest. It accepts `candidate` only when the reference equals the candidate Manifest and approved plan, the candidate detached manifest is already cached and independently re-verifies under the committed trust policy, and the verified compatibility edge authorizes the installed-to-candidate transition. A journal mismatch cannot expand this two-entry allowlist and fails before candidate code executes.
+The journal may not contain a wheel URL, asset hash, repository, tag, or trust-policy override. After the launcher starts its own exact wheel, that pinned CLI interprets the journal. It accepts `runtime_role: committed` only when the reference equals the Release Identity and detached-manifest digest in the committed project Manifest. It accepts `candidate` only when the reference equals the candidate Manifest and approved plan, the candidate detached manifest is already cached and independently re-verifies under the committed trust policy, and the verified compatibility edge authorizes the installed-to-candidate transition. A journal mismatch cannot expand this two-entry allowlist and fails before candidate code executes.
 
-While a transaction is unfinished, the launcher permits only read-only diagnostics plus the matching `recover` command through the selected allowed runtime. An unfinished task transaction therefore blocks `route decide`, task loaders, and every unrelated write command. This works whether a crash occurred before or after candidate launcher files were replaced.
+While a transaction is unfinished, the pinned CLI permits only read-only diagnostics plus the matching `recover` command through the selected allowed runtime. An unfinished task transaction therefore blocks `route decide`, task loaders, and every unrelated write command. This works whether a crash occurred before the launcher rename, between the launcher and descriptor renames in either order, or after both managed files reached their candidate states.
 
-Launcher and descriptor changes are ordinary managed artifacts with byte-and-mode CAS, backups, and atomic rename. Compatibility metadata must prove that both the preimage and candidate launcher contracts understand the transaction's recovery-runtime schema. Manifest commit switches the normal runtime authority; pre-commit rollback restores the prior launcher and descriptor, while post-commit recovery performs cleanup only.
+Launcher and descriptor changes are ordinary managed artifacts with independent byte-and-mode CAS, backups, and per-file atomic rename. Compatibility metadata must prove that both the preimage and candidate launcher contracts understand the transaction's recovery-runtime schema and mixed preimage/candidate file-state recovery. Manifest commit switches the normal runtime authority; pre-commit rollback restores the prior launcher and descriptor under CAS, while post-commit recovery performs cleanup only.
 
-A forward upgrade begins in the trusted committed runtime, which verifies the target detached manifest and wheel before invoking that exact local wheel for the upgrade-only entry. A mismatched external CLI may run only `upgrade` when its verified Release Identity and compatibility edge authorize the installed-to-running transition; all other commands fail closed. Rollback to a listed earlier release may be orchestrated by the currently installed launcher runtime through the same detached-manifest verification. After upgrade commit, all normal wrapper calls use the newly committed descriptor.
+A forward upgrade begins in the trusted committed runtime, which verifies the target detached manifest and wheel before invoking that exact local wheel for the upgrade-only entry. A mismatched external CLI may run only `upgrade` when its verified Release Identity and compatibility edge authorize the installed-to-running transition; all other commands fail closed. Rollback to a listed earlier release may be orchestrated by the currently installed launcher runtime through the same detached-manifest verification. After upgrade commit, all normal wrapper calls start through the newly committed launcher, and the started CLI requires the post-wheel descriptor to match the committed Manifest.
 
 Only allowlisted leaf skills enter platform auto-discovery directories. Route-gated content is installed under a managed, non-discoverable catalog:
 
@@ -1220,14 +1274,16 @@ Ordinary `doctor` inspects actual harness configuration only through read-only m
 Provider execution security is independent of platform-adapter capabilities. Each control is assigned one policy level:
 
 - `required`: unavailable or failed enforcement blocks execution.
-- `approval-required`: unavailable enforcement blocks until the user reviews a concrete risk report and approves that one provider execution in that one saved plan.
+- `approval-required`: unavailable enforcement blocks until the user reviews a concrete risk report and approves auditable attempts of one immutable provider-execution plan within its bounded approval window.
 - `best-effort`: the CLI attempts and reports the control but does not block solely because it is unavailable.
 
 `sol56-sdd` requires temporary HOME/XDG directories, environment allowlisting, secret stripping, closed stdin, target-path isolation, time and output limits, archive/cache integrity, and baseline OS resource limits. Enforceable network isolation is approval-required. Enhanced namespace, seccomp, or container isolation is best-effort.
 
 Before any third-party process starts, the Renderer creates a canonical provider-execution plan containing the provider and command digests, project and workspace identities, workflow-lock digest, input digests, requested controls, measured isolation gaps, and a prospective transaction ID. An `approval-required` exception binds to that provider-plan digest, not to a final reconcile plan that cannot yet exist. The initializer result, approval record, sanitized diagnostics, and output digests then become inputs to the final reconcile plan, which still requires its separate apply approval.
 
-An approval is valid for exactly one provider-execution plan, provider version, workspace instance, and prospective transaction identity. It is not reusable by another render, target project, or changed command and cannot become a persistent silent downgrade. Planning with such approval still performs no target-project writes.
+An approval is valid only for one immutable provider-execution plan digest, provider/version, workspace instance, prospective transaction identity, and finite approval window. It authorizes serialized, auditable retries of that exact plan when an attempt is interrupted or fails; it does not claim exactly one process invocation. Any changed command, inputs, controls, provider identity, workspace, prospective transaction, or expired approval requires a new approval and cannot become a persistent silent downgrade. Planning with such approval still performs no target-project writes.
+
+Before each provider process starts, the cache layer acquires a cache-side lock and atomically appends an attempt record under `<user-cache>/agent-workflow-pack/provider-attempts/<workspace-id>/<provider-plan-digest>.json`. The record binds a unique attempt ID, approval digest, provider-plan digest, prospective transaction identity, start time, command digest, isolation measurements, and state `started`; completion records the exit category, sanitized-output digest, validated candidate-output digest when present, and state `succeeded`, `failed`, or `interrupted`. Attempts for one plan never overlap. A retry creates a new attempt record and must revalidate the unchanged plan and unexpired approval; a crashed `started` attempt is retained as interrupted evidence rather than erased or treated as approval consumption. The attempt journal is audit evidence, not a supply-chain or target-project authority.
 
 Hash verification establishes identity, not safe execution. Third-party initializers execute with:
 
@@ -1333,7 +1389,7 @@ Natural-language classification evaluation may be added later as a non-blocking 
 
 ### 26.1 Schema, Canonicalization, and Property Tests
 
-Test duplicate YAML keys, inheritance cycles, unknown fields, JCS digests, set sorting, Merkle inputs, path normalization, POSIX-mode normalization, marker parsing, Release Identity, detached-manifest trust rules, release-compatibility edges, the saved-plan operation union, closed Route Decision branches, approval-verifier envelopes, workspace/replay/outbox schema migrations, replay state transitions, and Manifest generations. Property/fuzz tests target path normalization, bounded metadata-path expansion, archive extraction, release-manifest URLs and redirects, general URL handling, and marker parsers.
+Test duplicate YAML keys, inheritance cycles, unknown fields, JCS digests, set sorting, Merkle inputs, path normalization, POSIX-mode normalization, marker parsing, Release Identity, detached-manifest trust rules, release-compatibility edges, the saved-plan operation union, closed Route Decision branches, approval-verifier envelopes, workspace/replay/outbox schema migrations, the immutable `journal_binding_digest`, replay state transitions, provider-attempt journals, and Manifest generations. Property/fuzz tests target path normalization, bounded metadata-path expansion, archive extraction, release-manifest URLs and redirects, general URL handling, and marker parsers.
 
 ### 26.2 Resolver and Policy Tests
 
@@ -1345,11 +1401,13 @@ Snapshot Claude Code, Codex, and OpenCode output. Verify route-gated runtime con
 
 ### 26.4 Reconciler Tests
 
-Use temporary projects to test every ownership class, protected paths, symlink refusal, byte-and-mode CAS, executable-bit changes, repair, overlay retirement, launcher/descriptor atomic replacement, cold-cache descriptor-hash bootstrap, transaction-created directory cleanup, atomic workspace-plus-ledger registration, every saved-plan operation branch, cross-clone saved-plan refusal, saved-plan staleness, read-only `doctor`, explicit write-probe cleanup and interruption, filesystem capability refusal, and no-write conflict behavior.
+Use temporary projects to test every ownership class, protected paths, symlink refusal, byte-and-mode CAS, executable-bit changes, repair, overlay retirement, single-file launcher authority, post-wheel descriptor validation, mixed launcher/descriptor preimage and candidate states, cold-cache launcher-bound bootstrap, transaction-created directory cleanup, atomic workspace-plus-ledger registration, compatibility-edge local-state migration, every saved-plan operation branch, cross-clone saved-plan refusal, saved-plan staleness, read-only `doctor`, explicit write-probe cleanup and interruption, filesystem capability refusal, and no-write conflict behavior.
 
 ### 26.5 Crash and Concurrency Tests
 
-Inject process termination at each Reconciler, workspace-registration, task-admission, and task-archive phase. Test two CLI writers, two admissions for one task ref, duplicate approval proofs with different transaction IDs, crash after the planned journal but before replay reservation, same-transaction resume after proof expiry, consumed tombstones, missing/corrupt-ledger fail-closed behavior, two claimants at the same revision, task mutation against maintenance admission, admission crash around task move, metadata application, and the `admitting -> active` commit, archive crash around the directory move and integration commit, task-transaction blocking, outbox replay idempotency, disabled pre-commit hooks and Git auto-commit, cache contention, external byte or mode modification immediately before rename, manifest-committed cleanup, and CAS rollback refusal.
+Inject process termination at each Reconciler, workspace-registration, local-state-migration, task-admission, and task-archive phase. Terminate immediately before and after the launcher rename and immediately before and after the descriptor rename, and verify every resulting recorded old/new combination can start its exact wheel and enter only the matching recovery path. Test two CLI writers, two admissions for one task ref, duplicate approval proofs with different transaction IDs, crash after the planned journal but before replay reservation, rollback crashes between CAS-creating `reserved` and CAS-transitioning it to `consumed`, same-transaction resume after proof expiry, consumed tombstones, missing/corrupt-ledger fail-closed behavior, two claimants at the same revision, task mutation against maintenance admission, admission crash around task move, metadata application, and the `admitting -> active` commit, archive crash around the directory move and integration commit, task-transaction blocking, outbox replay idempotency, local-state migration after each candidate write and around Manifest commit, disabled pre-commit hooks and Git auto-commit, cache contention, external byte or mode modification immediately before rename, manifest-committed cleanup, immutable maintenance binding across mutable journal-phase updates, and CAS rollback refusal.
+
+Bootstrap tests run with no compatible Python, malicious project and user `uv.toml`, a hostile `.env`, injected `UV_INDEX` and Python-selection variables, an installed global same-name tool, empty and populated controlled caches, and redirect/hash failures. They assert that the launcher uses only its absolute validated uv and local-Python paths, downloads no Python or secondary package/build artifact, ignores ambient configuration and tools, and either starts the exact hash-bound wheel or fails closed. Provider tests serialize concurrent attempts, retain interrupted attempt evidence, permit auditable retry only for the unchanged plan while approval remains valid, and require new approval for any changed or expired plan.
 
 ### 26.6 End-to-end Sequence
 
@@ -1371,7 +1429,9 @@ init
   -> assert completed task still blocks upgrade
   -> injected task-archive crash + task recover
   -> archive task completely
-  -> approved upgrade
+  -> approved upgrade with injected local-state migration crash
+  -> recover migration under CAS
+  -> complete approved upgrade
 ```
 
 A sanitized, synthetic snapshot derived from the current sibling `workflow-pack` structure is committed under `tests/fixtures/`. It preserves the relevant Trellis, router, skill, and ownership-conflict shapes without copying personal journals, local developer identity, caches, or unrelated documents. Tests prove that `.trellis/tasks/`, `.trellis/workspace/`, `.trellis/spec/`, and Spec Kit feature artifacts are not claimed at directory scope.
@@ -1394,12 +1454,17 @@ Release gates require:
 
 - wheel, sdist, and Git-checkout `distribution_render_digest` values are identical;
 - wheel, sdist, and Git checkout compute one Release Identity, while their detached manifest binds the final distribution hashes without being packaged inside them;
+- `launcher_bundle_digest` contains only release-neutral templates, schemas, and verifier logic, while detached-manifest substitutions affect only rendered-launcher and distribution-render digests;
 - release-manifest verification rejects the wrong repository, tag, mutable release, redirect host, asset size/hash, source commit, or bundle identity;
-- a cold-cache project launcher succeeds using only the declared `sh`, `uv`/`uvx`, and `sha256sum` prerequisites, verifies its descriptor digest, downloads only the embedded hash-bound wheel, and performs full trust-policy/detached-manifest validation inside that wheel before command dispatch;
+- a cold-cache project launcher succeeds using only declared `sh`, `env`, release-supported `uv`/`uvx`, and an installed compatible Python; its fixed isolated uv invocation ignores ambient configuration, downloads only the embedded hash-bound wheel, never downloads Python or another package/build artifact, and performs full trust-policy, detached-manifest, project, descriptor, and journal validation inside that wheel before command dispatch;
+- process termination at every launcher/descriptor rename boundary leaves a journal-recorded preimage/candidate combination from which the exact started CLI can enter only diagnostics or matching recovery;
 - recovery journals containing URLs, hashes, trust-policy overrides, or runtime identities outside the committed/candidate allowlist are rejected before execution;
 - all default platforms meet their profile-required capability levels;
 - a clean WSL/Linux environment initializes from the published artifact;
 - a fresh clone runs `workspace register` and `route decide` through the project launcher with cache-hit, permitted pinned-redownload, offline-miss, hash-mismatch, version-mismatch, and unfinished-transaction recovery cases;
+- maintenance remains valid across mutable transaction-journal phase changes because it binds only the immutable journal header;
+- every supported local-state schema transition passes per-stage crash, CAS rollback, and Manifest-commit recovery tests without resetting workspace, replay, or outbox state;
+- provider approval tests prove auditable retry semantics for one unchanged plan and reject changed, expired, cross-workspace, or overlapping attempts;
 - every initializer produces its lock-bound content-root digest in two independent clean runs;
 - repeated `sync` is a true no-op;
 - crash, CAS, active-task, repair, and upgrade tests pass;
@@ -1461,7 +1526,7 @@ The current custom skills are migration inputs, not automatically valid release 
 - **AC-21:** Concurrent executor claims at one base revision result in exactly one successful atomic state transition.
 - **AC-22:** A model-generated Route Decision or command flag cannot satisfy the enforced user approval required by `task admit`.
 - **AC-23:** A fresh clone must register a new local workspace identity before writes, and a saved plan from another clone is rejected by default.
-- **AC-24:** With no cached detached manifest, a fresh clone can bootstrap the exact descriptor-bound wheel using only the declared `sh`, `uv`/`uvx`, and `sha256sum` prerequisites, after which the pinned CLI verifies the packaged trust policy and detached manifest before executing `workspace register`, `route decide`, or any other command. Descriptor, trust-policy, wheel-hash, Release Identity/source/pack-version, or offline-cache failures close without JSON-parsing shell fallbacks, PATH-resolved `agent-stack`, undeclared helper tools, or latest-version resolution.
+- **AC-24:** With no cached detached manifest, a fresh clone can bootstrap the launcher-bound exact wheel using only declared `sh`, `env`, a release-supported `uv`/`uvx`, and installed Python `>=3.11,<3.15`. The launcher uses absolute validated tool paths, a fixed cleared environment, and the specified isolated/no-config/no-index/no-sources/no-build/no-Python-download uv arguments; malicious `uv.toml`, `.env`, `UV_*` values, global same-name tools, or absence of compatible Python cannot change resolution or cause a second download. The pinned CLI then verifies the packaged trust policy, detached manifest, Manifest, descriptor, and any journal before executing `workspace register`, `route decide`, or another command.
 - **AC-25:** Every `create-integrated-task` Decision and approval proof binds one task ref, intent, operation, workspace, and one-time challenge. The task shell and integration revision 1 commit through the specified admission transaction; every admission or archive crash point is diagnosable, recoverable under CAS, and blocked from becoming a partially accepted task state.
 - **AC-26:** Ordinary `doctor` and every `--dry-run` perform zero target writes. Filesystem mutation probes run only through explicit `doctor --write-probe` or inside an approved apply transaction after lock acquisition, and interrupted probe residue is tracked and safely recoverable.
 - **AC-27:** A `completed` but non-archived task remains gating; only a fully committed `archived` lifecycle state permits an otherwise compatible contract-changing upgrade.
@@ -1472,15 +1537,21 @@ The current custom skills are migration inputs, not automatically valid release 
 - **AC-32:** Approval verifier envelopes bind direct-human actor, supported verifier/harness version, workspace, decision, challenge, task, intent, and finite validity window. A transaction-independent proof key can bind at most one transaction through `absent -> reserved -> consumed`; initial reservation occurs within TTL, same-transaction recovery may continue after expiry, the journal-before-reservation crash window is recoverable, and a committed workspace with missing or corrupt ledger state fails closed.
 - **AC-33:** Trellis active/archive roots and metadata paths pass cross-ownership validation. Bounded declarations expand to a finite journal-recorded exact set, and the Task-state Service cannot write an artifact-managed, control-plane, Git, Spec Kit, source, unrelated user-owned, or unplanned path.
 - **AC-34:** Saved plans validate as exactly one operation branch: `init` has no installed release, `sync` and `repair` require identical installed/candidate releases, and `upgrade` permits a difference only through a verified directed compatibility edge.
+- **AC-35:** Detached-manifest-derived launcher substitutions and their renderer version affect `render_digest`, `applied_file_hash`, and `distribution_render_digest` but are absent from `launcher_bundle_digest`; release CI rejects every launcher-bundle reference or input that recreates a distribution or manifest digest cycle.
+- **AC-36:** The launcher is the sole pre-wheel authority and is switched by one atomic file rename. The descriptor cannot block wheel startup and is validated only by the pinned CLI. Termination at every launcher and descriptor rename boundary leaves only journal-recorded preimage/candidate file states from which matching recovery succeeds; an unrecorded third state fails closed.
+- **AC-37:** Maintenance binds `journal_binding_digest` over the immutable transaction header, and the committing Manifest records the same digest. Mutable phase, applied-file, diagnostic, retry, and rollback updates neither invalidate nor require rewriting the marker, while any change to a bound header field is rejected.
+- **AC-38:** First init, workspace registration, and compatibility-edge migration are the only writers to local state besides ordinary Task-state Service transitions. Every migration journals exact workspace/replay/outbox preimages and candidates, applies them before Manifest commit, supports pre-commit CAS rollback at every crash point, and never repairs failure by recreating empty state.
+- **AC-39:** Replay rollback from a durable admission journal with no ledger entry performs the legal two-step `absent -> reserved -> consumed` transition for the same transaction. A crash between those CAS writes can only resume consumption and can never make the proof reusable.
+- **AC-40:** An `approval-required` provider approval authorizes serialized, audit-journaled retries only for one unchanged immutable provider plan, provider/version, workspace, prospective transaction, and validity window. Changed or expired plans require new approval, concurrent attempts do not overlap, and interrupted attempt evidence is retained.
 
-## 31. Implementation Decomposition
+## 31. Deferred Implementation Decomposition
 
-The approved design should be implemented through separate feature specs, in this order:
+Only after unconditional design approval may separate feature specs be created in this order:
 
 1. **Core schemas and Resolver** — profiles, catalog, locks, canonicalization, artifact definitions, saved-plan union, local-state schemas, IR, policy graph, and diagnostics.
 2. **Providers and secure cache** — acquisition, isolation, verification, extraction limits, provenance, and cache concurrency.
 3. **Renderer and Reconciler** — staging, ownership, operation-discriminated plans, OS lock, CAS, transactions, repair, and recovery.
-4. **Runtime launcher and Task-state Service** — descriptor-hash cold bootstrap, pinned launcher delivery, atomic workspace/ledger registration, versioned replay ledger and outbox, integration union, task locks and CAS, claims, admitting/archive transactions, recovery, and maintenance coordination.
+4. **Runtime launcher and Task-state Service** — single-file launcher cold bootstrap, post-wheel descriptor validation, pinned runtime delivery, atomic workspace/ledger registration, versioned replay ledger and outbox, integration union, task locks and CAS, claims, admitting/archive transactions, recovery, and maintenance coordination.
 5. **Route admission and Platform Adapters** — compiled admission policy, closed Route Decision union, intent-bound executable signals, approval-verifier envelopes, runtime catalog and loaders, Trellis root/metadata cross-ownership contracts, capability probes, adapter projection, and platform golden output.
 6. **Lifecycle, packaging, and release** — CLI commands, JSON contracts, detached release manifests, immutable-repository trust policy, local-state compatibility edges, upgrade flow, E2E tests, artifact builds, trust anchors, and notices.
 
@@ -1493,5 +1564,6 @@ Each feature spec must preserve the authority boundaries and acceptance criteria
 - WSL-mounted filesystems may provide weaker durability semantics; v0.1 promises process-crash recovery only.
 - Upstream platform and Trellis templates may change paths or hook behavior; adapter and harness versions therefore remain locked and tested.
 - Trellis-derived overlays and generated content require artifact-level provenance and license handling rather than a repository-wide assumption.
+- The project launcher is a same-user-writable shell file. The design detects supply-chain substitution, accidental drift, and inconsistent upgrades, but executing a maliciously modified checkout is outside its trust boundary because that launcher can run before project-state verification. When tampering is suspected, read-only verification must use the external canonical `uvx` command derived from the verified detached manifest rather than any executable from the checkout.
 
-The fourth-version architecture is approved with required errata. This incremental revision applies those errata and awaits diff-only confirmation before unconditional approval; implementation planning remains prohibited until that confirmation.
+The fourth-version architecture remains stable, but this candidate is still `Changes required` until the incremental protocol errata receive diff-only approval. Implementation planning and feature-spec decomposition remain prohibited until that confirmation.
