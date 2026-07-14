@@ -30,6 +30,7 @@
 - Production `recover --transaction` now loads the exact lifecycle journal, verifies project/caller authority, reconstructs the packaged scanner contract, and resumes committed cleanup through the real Reconciler recovery path.
 - Production `upgrade` now verifies the initialized project against the running immutable release and returns an exact same-release no-op; a distinct target is immutable-release verified before the command stops at the saved-plan approval boundary.
 - A real built-and-installed wheel/sdist now passes the no-context-injection console chain `bootstrap → init --dry-run → init → doctor → test-routing → sync --dry-run → sync → sync` with HTTPS replaced only at the test transport boundary. It proves 17 owners, routing policy, user-file preservation, and strict repeated-sync no-op.
+- `doctor --write-probe` now creates a durable ignored-local probe transaction before target mutation; normal completion records exact evidence, while `recover --probe` cleans only recorded byte-identical residue and explicitly resumes or rolls back under project locks.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Focused release-authority and console verification: 9 tests passed; Ruff and mypy passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
@@ -48,4 +49,4 @@
 
 ## Resume
 
-Bind standalone write-probe recovery, attach the installed-wheel evidence to the production-integration prerequisite, and run the complete release-gate verification.
+Attach the installed-wheel evidence to the production-integration prerequisite, then run full Ruff, mypy, pytest, artifact rebuild, provenance/inventory checks, and the 13 release gates.

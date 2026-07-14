@@ -259,6 +259,122 @@ def test_production_upgrade_defaults_to_exact_running_release_no_op(
     assert result["transaction_id"] is None
 
 
+def test_production_doctor_write_probe_records_completed_transaction(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+    monkeypatch.setattr(release_commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(release_commands, "_authorize_running_release", _verified_release)
+
+    result = release_commands.run_doctor(
+        ProductionCommand(
+            invocation=CommandInvocation(
+                command="doctor",
+                options=MappingProxyType({"write_probe": True}),
+                json_output=True,
+                debug=False,
+            ),
+            repository_root=project,
+        )
+    )
+
+    probe = result["write_probe"]
+    assert isinstance(probe, Mapping)
+    assert probe["status"] == "complete"
+    assert isinstance(probe["probe_id"], str)
+    assert not list(project.glob(".agent-workflow-probe-*"))
+
+
+def test_production_probe_recover_cleans_recorded_residue_and_resumes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import agent_stack.reconcile.probe_transaction as probe_transaction
+
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+    monkeypatch.setattr(release_commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(release_commands, "_authorize_running_release", _verified_release)
+
+    def interrupt(root: Path, *, probe_id: str):
+        residue = root / f".agent-workflow-probe-{probe_id}"
+        residue.mkdir()
+        (residue / "lock").write_bytes(b"")
+        raise RuntimeError("simulated standalone probe crash")
+
+    monkeypatch.setattr(probe_transaction, "run_write_probe", interrupt)
+    with pytest.raises(RuntimeError, match="simulated standalone probe crash"):
+        release_commands.run_doctor(
+            ProductionCommand(
+                invocation=CommandInvocation(
+                    command="doctor",
+                    options=MappingProxyType({"write_probe": True}),
+                    json_output=True,
+                    debug=False,
+                ),
+                repository_root=project,
+            )
+        )
+    journals = list(
+        (project / ".agent-workflow/local/probe-transactions").glob("*.json")
+    )
+    assert len(journals) == 1
+    probe_id = journals[0].stem
+    monkeypatch.undo()
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+
+    recovered = commands.run_recover(
+        _launcher_command(
+            project,
+            tmp_path / "caller-probe-recover",
+            command="recover",
+            options=MappingProxyType(
+                {
+                    "journal_kind": "probe",
+                    "journal_id": probe_id,
+                    "recovery_action": "resume",
+                }
+            ),
+        )
+    )
+
+    assert recovered["journal_kind"] == "probe"
+    assert recovered["committed"] is True
+    assert not list(project.glob(".agent-workflow-probe-*"))
+
+
 def test_production_workspace_register_recreates_clone_local_contract(
     tmp_path: Path, monkeypatch
 ) -> None:

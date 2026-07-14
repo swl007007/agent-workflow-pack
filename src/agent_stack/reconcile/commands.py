@@ -95,6 +95,7 @@ def run_recover(payload: object) -> object:
         recover_workspace_registration,
     )
     from agent_stack.reconcile.recovery import recover_transaction
+    from agent_stack.reconcile.probe_transaction import recover_standalone_probe
 
     command = cast(ProductionCommand, payload)
     kind = command.invocation.options.get("journal_kind")
@@ -130,6 +131,20 @@ def run_recover(payload: object) -> object:
                 "transaction_id": transaction_id,
                 "committed": lifecycle_result.get("committed") is True,
                 "rolled_back": lifecycle_result.get("rolled_back") is True,
+            }
+        )
+    if kind == "probe":
+        probe_result = recover_standalone_probe(
+            command.repository_root, transaction_id, action=action
+        )
+        return MappingProxyType(
+            {
+                "schema_id": "agent-workflow.recovery-result",
+                "schema_version": 1,
+                "journal_kind": kind,
+                "transaction_id": transaction_id,
+                "committed": probe_result.get("status") == "complete",
+                "rolled_back": probe_result.get("status") == "rolled-back",
             }
         )
     if kind == "workspace-registration":

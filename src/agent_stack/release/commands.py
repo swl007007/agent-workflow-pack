@@ -43,8 +43,7 @@ def run_doctor(payload: object) -> Mapping[str, object]:
         apply=False,
         data_root=_data_root(),
     )
-    return MappingProxyType(
-        {
+    result: dict[str, object] = {
             "schema_id": "agent-workflow.doctor-result",
             "schema_version": 1,
             "repository_root": str(command.repository_root),
@@ -61,7 +60,11 @@ def run_doctor(payload: object) -> Mapping[str, object]:
             },
             "production_owner_binding_count": len(production_owner_bindings()),
         }
-    )
+    if bool(command.invocation.options.get("write_probe")):
+        from agent_stack.reconcile.probe_transaction import run_standalone_probe
+
+        result["write_probe"] = run_standalone_probe(command.repository_root)
+    return MappingProxyType(result)
 
 
 def run_upgrade(payload: object) -> object:
