@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.task-transaction",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.task-transaction.v1", "agent-workflow.task-tree.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "transaction_id", "operation", "task_id", "task_ref", "immutable_header", "journal_binding_digest", "phase", "outcome", "diagnostics", "rollback_state"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.task-transaction"},
+    "schema_version": {"const": 1},
+    "transaction_id": {"$ref": "#/$defs/uuid"},
+    "operation": {"enum": ["admit", "claim", "transition", "release", "archive"]},
+    "task_id": {"$ref": "#/$defs/uuid"},
+    "task_ref": {"type": "string", "minLength": 1},
+    "immutable_header": {"type": "object"},
+    "journal_binding_digest": {"$ref": "#/$defs/sha256"},
+    "phase": {"enum": ["planned", "staged", "task_moved", "metadata_applied", "admission_committed", "state_marked", "archive_committed", "integration_committed", "cleanup_pending", "complete"]},
+    "outcome": {"enum": [null, "committed", "rolled-back"]},
+    "diagnostics": {"type": "array"},
+    "rollback_state": {"type": "object"}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}
