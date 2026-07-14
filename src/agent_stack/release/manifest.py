@@ -106,17 +106,19 @@ class VerifiedRelease:
     compatibility: Mapping[str, object] | None = None
 
 
-def _parse_json_object(body: bytes, label: str) -> dict[str, object]:
+def _parse_json_object(
+    body: bytes, label: str, *, require_canonical: bool = False
+) -> dict[str, object]:
     try:
         text = body.decode("utf-8")
         parsed = SchemaCatalog.parse_json(text)
     except (UnicodeError, LifecycleFailure) as error:
-        raise _manifest_failure(f"{label} is not valid canonical JSON") from error
+        raise _manifest_failure(f"{label} is not valid JSON") from error
     except Exception as error:
         raise _manifest_failure(f"{label} is not valid JSON") from error
     if not isinstance(parsed, dict):
         raise _manifest_failure(f"{label} must be an object")
-    if canonical_json_bytes(parsed) != body:
+    if require_canonical and canonical_json_bytes(parsed) != body:
         raise _manifest_failure(f"{label} is not canonical JSON")
     return cast(dict[str, object], parsed)
 
@@ -253,7 +255,9 @@ def verify_release_manifest(
         for field, value in expected_manifest_evidence.items()
     ):
         raise _manifest_failure("detached manifest disagrees with release asset evidence")
-    manifest = _parse_json_object(manifest_response.body, "detached manifest")
+    manifest = _parse_json_object(
+        manifest_response.body, "detached manifest", require_canonical=True
+    )
     if set(manifest) != _MANIFEST_FIELDS:
         raise _manifest_failure("detached manifest fields are not closed")
     if (

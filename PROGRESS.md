@@ -1,9 +1,9 @@
 # Production Integration Progress
 
 - Approved plan: `docs/superpowers/plans/2026-07-14-production-composition-release-fix.md`
-- Branch: `fix/v0.1.1-immutable-release`
+- Branch: `fix/v0.1.2-github-json`
 - Worktree: `/mnt/c/Users/swl00/IFPRI Dropbox/Weilun Shi/Plan/agent-workflow-pack`
-- Release status: `v0.1.0` is preserved as a failed mutable publication; repository immutability is enabled and the `v0.1.1` corrective release is being prepared.
+- Release status: `v0.1.0` and `v0.1.1` are preserved as failed publications; repository immutability is enabled and the `v0.1.2` corrective release is being prepared.
 - Execution approval: continue through immutable publication and post-release acceptance.
 
 ## Completed
@@ -39,13 +39,13 @@
 
 ## In Progress
 
-- Freeze, tag, publish, and post-release dogfood the corrective `v0.1.1` Release Identity.
+- Freeze, tag, publish, and post-release dogfood the corrective `v0.1.2` Release Identity.
 
 ## Remaining
 
-- Commit the real GitHub REST tag-resolution and repository-immutability guard.
-- Fast-forward `main`, create and push `v0.1.1`, publish exact frozen assets, re-fetch hashes, and run canonical installed-console dogfood.
+- Commit support for ordinary non-canonical GitHub REST JSON while retaining canonical detached-manifest enforcement.
+- Fast-forward `main`, create and push `v0.1.2`, publish exact frozen assets, re-fetch hashes, and run canonical installed-console dogfood.
 
 ## Resume
 
-Resume from the `v0.1.1` freeze commit; never move or replace `v0.1.0` or its assets.
+Resume from the `v0.1.2` freeze commit; never move or replace earlier tags or assets.

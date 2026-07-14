@@ -16,7 +16,7 @@ from tools.release.publish_release import _bundle_roots
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 TAG = f"v{VERSION}"
 REPOSITORY = "swl007007/agent-workflow-pack"
 

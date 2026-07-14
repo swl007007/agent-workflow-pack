@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Callable
 
 import pytest
@@ -133,7 +134,7 @@ def _install_fetcher(
     metadata = _release_metadata(manifest_bytes)
     if metadata_mutator is not None:
         metadata_mutator(metadata)
-    metadata_bytes = canonical_json_bytes(metadata)
+    metadata_bytes = json.dumps(metadata, indent=2).encode("utf-8")
     policy = PackagedTrustPolicy.from_document(policy_document())
     locator = ReleaseLocator(
         version=VERSION,
@@ -154,7 +155,9 @@ def _install_fetcher(
         if url == api_url:
             return FetchedContent(api_final_url or api_url, metadata_bytes)
         if url == commit_url:
-            return FetchedContent(commit_url, canonical_json_bytes({"sha": tag_commit}))
+            return FetchedContent(
+                commit_url, json.dumps({"sha": tag_commit}, indent=2).encode("utf-8")
+            )
         if url == MANIFEST_URL:
             return FetchedContent(MANIFEST_URL, manifest_bytes)
         raise AssertionError(f"unexpected fetch URL: {url}")

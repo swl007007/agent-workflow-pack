@@ -1,8 +1,8 @@
 {
   "schema_id": "agent-workflow.e2e-final-artifact-contract",
   "schema_version": 1,
-  "artifact_set_digest": "84be535b3b27af859104c4c504f10f10ce6d72bdf544cae04b305cfc25b57caa",
-  "wheel_sha256": "c8ff572279ff8b5a12b237454efa82111eb1c63da4e1260773baac423c7cfcb4",
-  "sdist_sha256": "b46478b78c9987c2a90e48d7e86e4e7785bb6561fd997d2c388e59980ed273d0",
-  "render_digest": "164b31ccf77ea21771d348319024cc1bbb90e59dc41eea956f6099ac9ce1c8a0"
+  "artifact_set_digest": "de2bb57d886ebe96a09dc8ab6cc76a00b56c33dd26546857484040ea7999a109",
+  "wheel_sha256": "ebd5d8b6874caf68629253b94b80b4a102c6f39f663ad8c38e6a263bcecfb26d",
+  "sdist_sha256": "dffde1cf50d76d707bbd4d370af995629e9f7c3ae42b76d165dafa9e7f221b61",
+  "render_digest": "d84014fda4958057293bd7b0f408f84f0acfddea54ec40e98ba96f02fb2a095f"
 }
