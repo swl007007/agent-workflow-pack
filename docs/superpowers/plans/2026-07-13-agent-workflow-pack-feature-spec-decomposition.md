@@ -97,12 +97,16 @@ core.task-evaluators.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a
 core.workspace-diagnostics.v1	task-1	task-4	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-4,task-5,task-6	task-4
 core.render-projection.v1	task-1	task-3	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-5,task-6	task-3
 core.errors.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-2,task-3,task-4,task-5,task-6	task-2
+providers.execution.v1	task-2	task-2	b19e57a0e4d6e5094b853d428909e4d10d2283de	8c3890facd3f57198a4427ef2497077b924b13c780b7ac9b14f5227106b21fdb	interface-frozen	task-3,task-6	task-3
+providers.errors.v1	task-2	task-2	b19e57a0e4d6e5094b853d428909e4d10d2283de	8c3890facd3f57198a4427ef2497077b924b13c780b7ac9b14f5227106b21fdb	interface-frozen	task-3,task-6	task-3
 ```
 <!-- interface-registry:end -->
 
 <!-- consumer-imports:start -->
 ```tsv
 consumer_task	consumer_content_commit	interface_id	producer_content_commit	registry_commit	imported_interface_digest
+task-2	b19e57a0e4d6e5094b853d428909e4d10d2283de	core.schema-catalog.v1	2e0bfda7619223397f7c9610d312a2aab42156ab	14edc566f707bb6ad21c551f1112b7c4f543330c	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77
+task-2	b19e57a0e4d6e5094b853d428909e4d10d2283de	core.errors.v1	2e0bfda7619223397f7c9610d312a2aab42156ab	14edc566f707bb6ad21c551f1112b7c4f543330c	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77
 ```
 <!-- consumer-imports:end -->
 
