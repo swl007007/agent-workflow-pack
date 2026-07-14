@@ -32,7 +32,7 @@
 - A real built-and-installed wheel/sdist now passes the no-context-injection console chain `bootstrap → init --dry-run → init → doctor → test-routing → sync --dry-run → sync → sync` with HTTPS replaced only at the test transport boundary. It proves 17 owners, routing policy, user-file preservation, and strict repeated-sync no-op.
 - `doctor --write-probe` now creates a durable ignored-local probe transaction before target mutation; normal completion records exact evidence, while `recover --probe` cleans only recorded byte-identical residue and explicitly resumes or rolls back under project locks.
 - Final verification passed from the release-gate commit candidate: Ruff, `mypy src`, runtime vendor lock, generated notices, 686 pytest tests, rebuilt wheel/sdist inventory, production-integration prerequisite, and all 13 release gates.
-- Frozen candidate identities: artifact set `03d3b0e6ec4248835ae87931d19fc7761438df5985930636a0967d0fc42aaaf1`; wheel `dd45f2bc464d12ffd21ed85de88608d00a3cea13ed4427a4209de885a83c9107`; sdist `a79b17becbb7d7b926bba88d8e04db3a9f3ace885c40d572adfacfe430b17fd1`.
+- Reproducible candidate identities: artifact set `32846384a650d9a3329101ff7f44c38e3f832c0aafcba8df4ad7e44f37bbf3fc`; wheel `d7b70c74c79a29abb79467fbf04a0df653e2fc75405965a9ec7fcb847af8364e`; sdist `81a79e37dd9a6e0d87b43886174c4d472d149cc600960d9e14f954e87040df59`.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Focused release-authority and console verification: 9 tests passed; Ruff and mypy passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
@@ -43,7 +43,7 @@
 
 ## Remaining
 
-- Commit the frozen `SOURCE_DATE_EPOCH` build input and obtain a green CI matrix.
+- Obtain a green CI matrix for the deterministic gzip framing fix.
 - Only after CI passes, create and publish `v0.1.4` and resume canonical dogfood.
 
 ## Resume

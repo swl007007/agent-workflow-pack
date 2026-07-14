@@ -1,16 +1,30 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import io
 import tarfile
 import zipfile
 from pathlib import Path
 
-from agent_stack.release.gates import _normalize_distribution_archives, _source_date_epoch
+from agent_stack.release.gates import (
+    _deterministic_gzip,
+    _normalize_distribution_archives,
+    _source_date_epoch,
+)
 
 
 def test_source_date_epoch_is_frozen_outside_commit_and_checkout_metadata() -> None:
     assert _source_date_epoch() == "315532800"
+
+
+def test_deterministic_gzip_has_fixed_stored_block_framing() -> None:
+    compressed = _deterministic_gzip(b"x" * 70_000)
+
+    assert gzip.decompress(compressed) == b"x" * 70_000
+    assert hashlib.sha256(compressed).hexdigest() == (
+        "7296010aa02c3f6283458d5abb80ac124323c61b4ae648d8d2923116376bf568"
+    )
 
 
 def _archives(root: Path, stamp: int) -> tuple[Path, Path]:

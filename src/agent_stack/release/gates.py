@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import binascii
 import hashlib
-import gzip
 import io
 import json
 import os
 import shutil
 import subprocess
+import struct
 import tarfile
 import zipfile
 from dataclasses import dataclass
@@ -241,6 +242,22 @@ def _source_date_epoch() -> str:
     return "315532800"
 
 
+def _deterministic_gzip(body: bytes) -> bytes:
+    compressed = bytearray(b"\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff")
+    for start in range(0, len(body), 65_535):
+        block = body[start : start + 65_535]
+        is_final = start + len(block) == len(body)
+        compressed.append(1 if is_final else 0)
+        compressed.extend(struct.pack("<HH", len(block), 0xFFFF - len(block)))
+        compressed.extend(block)
+    if not body:
+        compressed.extend(b"\x01\x00\x00\xff\xff")
+    compressed.extend(
+        struct.pack("<II", binascii.crc32(body) & 0xFFFFFFFF, len(body) & 0xFFFFFFFF)
+    )
+    return bytes(compressed)
+
+
 def _normalize_distribution_archives(wheel_path: Path, sdist_path: Path) -> None:
     wheel_records: list[tuple[str, bytes, bool]] = []
     with zipfile.ZipFile(wheel_path) as archive:
@@ -272,28 +289,26 @@ def _normalize_distribution_archives(wheel_path: Path, sdist_path: Path) -> None
                 member_body = stream.read()
             tar_records.append((original, member_body))
     sdist_candidate = sdist_path.with_suffix(sdist_path.suffix + ".normalized")
-    with sdist_candidate.open("wb") as raw:
-        with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0, compresslevel=0) as gz:
-            with tarfile.open(fileobj=gz, mode="w", format=tarfile.PAX_FORMAT) as archive:
-                for original, member_body in sorted(
-                    tar_records, key=lambda item: item[0].name
-                ):
-                    normalized_tar = tarfile.TarInfo(original.name)
-                    normalized_tar.type = original.type
-                    normalized_tar.linkname = original.linkname
-                    normalized_tar.mode = original.mode
-                    normalized_tar.uid = 0
-                    normalized_tar.gid = 0
-                    normalized_tar.uname = ""
-                    normalized_tar.gname = ""
-                    normalized_tar.mtime = int(_source_date_epoch())
-                    normalized_tar.size = (
-                        len(member_body) if member_body is not None else 0
-                    )
-                    archive.addfile(
-                        normalized_tar,
-                        None if member_body is None else io.BytesIO(member_body),
-                    )
+    tar_body = io.BytesIO()
+    with tarfile.open(fileobj=tar_body, mode="w", format=tarfile.PAX_FORMAT) as archive:
+        for original, member_body in sorted(
+            tar_records, key=lambda item: item[0].name
+        ):
+            normalized_tar = tarfile.TarInfo(original.name)
+            normalized_tar.type = original.type
+            normalized_tar.linkname = original.linkname
+            normalized_tar.mode = original.mode
+            normalized_tar.uid = 0
+            normalized_tar.gid = 0
+            normalized_tar.uname = ""
+            normalized_tar.gname = ""
+            normalized_tar.mtime = int(_source_date_epoch())
+            normalized_tar.size = len(member_body) if member_body is not None else 0
+            archive.addfile(
+                normalized_tar,
+                None if member_body is None else io.BytesIO(member_body),
+            )
+    sdist_candidate.write_bytes(_deterministic_gzip(tar_body.getvalue()))
     sdist_candidate.replace(sdist_path)
 
 
