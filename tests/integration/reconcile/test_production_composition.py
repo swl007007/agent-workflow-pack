@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import shutil
+import json
 from types import MappingProxyType
 
 from agent_stack.cli.parser import CommandInvocation
@@ -44,10 +45,12 @@ def _verified_release() -> VerifiedRelease:
     )
 
 
-def _command(root: Path, *, dry_run: bool) -> ProductionCommand:
+def _command(
+    root: Path, *, dry_run: bool, command: str = "init"
+) -> ProductionCommand:
     return ProductionCommand(
         invocation=CommandInvocation(
-            command="init",
+            command=command,
             options=MappingProxyType({"dry_run": dry_run}),
             json_output=True,
             debug=False,
@@ -130,3 +133,32 @@ def test_init_apply_uses_real_bundle_and_commits_complete_project_contract(
     assert (project / ".agent-workflow/manifest.json").is_file()
     assert (project / ".agent-workflow/local/workspace.json").is_file()
     assert (project / ".agent-workflow/local/approval-replay.json").is_file()
+
+    manifest_path = project / ".agent-workflow/manifest.json"
+    generation = json.loads(manifest_path.read_text(encoding="utf-8"))["generation"]
+    transaction_paths = sorted(
+        path.name for path in (project / ".agent-workflow/transactions").glob("*.json")
+    )
+    before = {
+        path.relative_to(project).as_posix(): path.read_bytes()
+        for path in project.rglob("*")
+        if path.is_file()
+    }
+
+    preview = commands.run_sync(_command(project, dry_run=True, command="sync"))
+    first_sync = commands.run_sync(_command(project, dry_run=False, command="sync"))
+    second_sync = commands.run_sync(_command(project, dry_run=False, command="sync"))
+
+    assert preview["no_op"] is True
+    assert preview["writes_performed"] == 0
+    assert first_sync["no_op"] is True
+    assert second_sync["no_op"] is True
+    assert json.loads(manifest_path.read_text(encoding="utf-8"))["generation"] == generation
+    assert sorted(
+        path.name for path in (project / ".agent-workflow/transactions").glob("*.json")
+    ) == transaction_paths
+    assert {
+        path.relative_to(project).as_posix(): path.read_bytes()
+        for path in project.rglob("*")
+        if path.is_file()
+    } == before

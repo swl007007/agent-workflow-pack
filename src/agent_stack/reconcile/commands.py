@@ -13,7 +13,7 @@ from agent_stack.release.manifest import VerifiedRelease
 
 from .errors import RendererFailure
 from .production_bundle import load_production_bundle
-from .production import compose_init
+from .production import compose_init, compose_sync
 
 
 def _data_root() -> Path:
@@ -68,11 +68,16 @@ def run_init(payload: object) -> Mapping[str, object]:
 
 def run_sync(payload: object) -> Mapping[str, object]:
     command = cast(ProductionCommand, payload)
+    release = cast(VerifiedRelease, _authorize_running_release())
     if bool(command.invocation.options.get("dry_run")):
-        return _dry_run(command, "sync")
-    raise RendererFailure(
-        "AWP_RECONCILE_RECOVERY_REQUIRED",
-        "production sync apply composition is not yet available",
+        return compose_sync(
+            command, release, apply=False, data_root=_data_root()
+        )
+    return compose_sync(
+        command,
+        release,
+        apply=True,
+        data_root=_data_root(),
     )
 
 

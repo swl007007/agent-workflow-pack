@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import uuid
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -61,6 +62,8 @@ def _resolver_inputs(
     task_state: TaskSnapshotAndFindings,
     *,
     render_units: Sequence[Mapping[str, object]] = (),
+    current_contract: Mapping[str, object] | None = None,
+    observed_state: Mapping[str, object] | None = None,
 ) -> ResolverInputs:
     return ResolverInputs(
         operation=operation,
@@ -79,12 +82,14 @@ def _resolver_inputs(
         router_contract_document=bundle.router_contract,
         entry_ownership=(),
         render_units=render_units,
-        current_contract={
+        current_contract=current_contract
+        or {
             "authority_digests": {},
             "surface_digests": {},
             "registry_graph_digest": CANONICAL_NULL,
         },
-        observed_state={"surface_digests": {}, "unclassified_runtime_units": []},
+        observed_state=observed_state
+        or {"surface_digests": {}, "unclassified_runtime_units": []},
         repair_surface_ids=(),
         diagnostics=(),
         task_snapshot=task_state.snapshot,
@@ -286,6 +291,57 @@ def _local_contract(
     )
 
 
+def _read_canonical_object(path: Path) -> Mapping[str, object]:
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"required committed authority is unavailable: {path.name}")
+    payload = path.read_bytes()
+    try:
+        document = json.loads(payload.decode("utf-8"))
+    except (UnicodeError, ValueError) as error:
+        raise ValueError(f"committed authority is invalid JSON: {path.name}") from error
+    if not isinstance(document, Mapping) or canonical_json_bytes(document) != payload:
+        raise ValueError(f"committed authority is not canonical JSON: {path.name}")
+    return document
+
+
+def _require_sync_authority(
+    root: Path,
+    release: VerifiedRelease,
+    bundle: ProductionBundle,
+    candidate: DesiredStateIR,
+) -> tuple[Mapping[str, object], Mapping[str, object]]:
+    manifest = _read_canonical_object(root / ".agent-workflow/manifest.json")
+    workspace = _read_canonical_object(root / ".agent-workflow/local/workspace.json")
+    if (
+        manifest.get("release_id") != release.identity.release_id
+        or manifest.get("release_manifest_digest") != release.manifest_digest
+        or manifest.get("pack_version") != release.identity.version
+        or workspace.get("project_id") != manifest.get("project_id")
+        or workspace.get("local_state_contract_digest")
+        != _mapping(manifest.get("local_state_contract"), "local state contract").get(
+            "contract_digest"
+        )
+    ):
+        raise ValueError("committed project authority differs from the verified release")
+    expected_manifest_digests = {
+        "profile_digest": candidate.authority_digests["profile"],
+        "lock_digest": candidate.authority_digests["workflow-lock"],
+        "artifact_bundle_digest": candidate.authority_digests["artifact-bundle"],
+    }
+    if any(manifest.get(field) != value for field, value in expected_manifest_digests.items()):
+        raise ValueError("committed Manifest authority differs from the packaged bundle")
+    contract = launcher_contract_from_release(release)
+    launcher = (root / ".agent-workflow/bin/agent-stack").read_bytes()
+    expected_control = canonical_json_bytes(contract.runtime_control(launcher))
+    if (root / ".agent-workflow/runtime-control.json").read_bytes() != expected_control:
+        raise ValueError("committed runtime-control differs from the verified launcher")
+    if (root / ".agent-workflow/workflow.lock").read_bytes() != canonical_json_bytes(
+        bundle.workflow_lock
+    ):
+        raise ValueError("committed workflow lock differs from the packaged lock")
+    return manifest, workspace
+
+
 def compose_init(
     command: ProductionCommand,
     release: VerifiedRelease,
@@ -370,4 +426,94 @@ def compose_init(
     return apply_plan(envelope, approval, scanner=scanner)
 
 
-__all__ = ["compose_init"]
+def compose_sync(
+    command: ProductionCommand,
+    release: VerifiedRelease,
+    *,
+    apply: bool,
+    data_root: Path,
+) -> Mapping[str, object]:
+    bundle = load_production_bundle(data_root)
+    scanner = NormativeTaskScanner(command.repository_root)
+    task_state = scanner(
+        bundle.trellis_layout,
+        bundle.trellis_layout,
+        bundle.discovery_schemas,
+        bundle.discovery_schemas,
+    )
+    preliminary = resolve(_resolver_inputs("sync", release, bundle, task_state))
+    manifest, workspace = _require_sync_authority(
+        command.repository_root, release, bundle, preliminary
+    )
+    current_contract = {
+        "authority_digests": dict(preliminary.authority_digests),
+        "surface_digests": dict(preliminary.surface_digests),
+        "registry_graph_digest": preliminary.authority_digests["surface-registry"],
+    }
+    observed_state = {
+        "surface_digests": dict(preliminary.surface_digests),
+        "unclassified_runtime_units": [],
+    }
+    units = _render_units(
+        bundle, release, preliminary.authority_digests["profile"]
+    )
+    ir = resolve(
+        _resolver_inputs(
+            "sync",
+            release,
+            bundle,
+            task_state,
+            render_units=units,
+            current_contract=current_contract,
+            observed_state=observed_state,
+        )
+    )
+    staged = _with_control_artifacts(
+        ir,
+        render(ir, (_provider_result(data_root),)),
+        release,
+        data_root,
+        bundle,
+    )
+    observed = {
+        "transaction_id": str(uuid.uuid4()),
+        "workspace_instance_id": workspace["workspace_instance_id"],
+        "manifest_digest": hashlib.sha256(
+            canonical_json_bytes(manifest)
+        ).hexdigest(),
+        "files": _observed_files(command.repository_root, staged),
+        "candidate_local_state_contract": _local_contract(release, bundle),
+        "provider_approval_bindings": [],
+        "recovery_runtime": {
+            "release_id": release.identity.release_id,
+            "release_manifest_digest": release.manifest_digest,
+            "runtime_role": "committed",
+        },
+    }
+    envelope = plan_reconcile(ir, staged, manifest, observed, task_state)
+    no_op = not bool(envelope.plan_core["candidate_file_states"])
+    if not apply:
+        return MappingProxyType(
+            {
+                "schema_id": "agent-workflow.reconcile-preview",
+                "schema_version": 1,
+                "operation": "sync",
+                "dry_run": True,
+                "planned_paths": [record.path for record in staged.files],
+                "writes_performed": 0,
+                "no_op": no_op,
+                "plan_digest": envelope.plan_digest,
+            }
+        )
+    approval = {
+        "plan_digest": envelope.plan_digest,
+        "project_root": str(command.repository_root),
+        "source_layout": bundle.trellis_layout,
+        "target_layout": bundle.trellis_layout,
+        "source_schemas": bundle.discovery_schemas,
+        "target_schemas": bundle.discovery_schemas,
+    }
+    return apply_plan(envelope, approval, scanner=scanner)
+
+
+__all__ = ["compose_init", "compose_sync"]
