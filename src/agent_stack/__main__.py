@@ -35,10 +35,17 @@ def main(
             )
         )
         repository_root = verified_launcher.project_root
+        caller_context_version = verified_launcher.caller_context_version
+        caller_fields = verified_launcher.caller_fields
     else:
         repository_root = None
+        caller_context_version = None
+        caller_fields = None
     context = runtime_context or compose_production_runtime_context(
-        invocation, repository_root=repository_root
+        invocation,
+        repository_root=repository_root,
+        caller_context_version=caller_context_version,
+        caller_fields=caller_fields,
     )
     result = compose_lifecycle_command(invocation, context)
     if invocation.json_output:

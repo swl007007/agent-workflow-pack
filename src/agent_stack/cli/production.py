@@ -22,6 +22,8 @@ class ProductionCommand:
 
     invocation: CommandInvocation
     repository_root: Path
+    caller_context_version: int | None = None
+    caller_fields: Mapping[str, str] | None = None
 
 
 def _sha256(path: Path) -> str:
@@ -131,12 +133,25 @@ def production_owner_bindings() -> Mapping[str, OwnerBinding]:
 
 
 def compose_production_runtime_context(
-    invocation: CommandInvocation, *, repository_root: Path | None = None
+    invocation: CommandInvocation,
+    *,
+    repository_root: Path | None = None,
+    caller_context_version: int | None = None,
+    caller_fields: Mapping[str, str] | None = None,
 ) -> VerifiedRuntimeContext:
     """Bind a real parsed console invocation to the production registry."""
 
     root = (repository_root or Path.cwd()).resolve(strict=True)
-    payload = ProductionCommand(invocation=invocation, repository_root=root)
+    if (caller_context_version is None) != (caller_fields is None):
+        raise RuntimeError("production caller envelope is incomplete")
+    payload = ProductionCommand(
+        invocation=invocation,
+        repository_root=root,
+        caller_context_version=caller_context_version,
+        caller_fields=(
+            None if caller_fields is None else MappingProxyType(dict(caller_fields))
+        ),
+    )
     return VerifiedRuntimeContext(
         owner_bindings=production_owner_bindings(),
         owner_payloads=MappingProxyType({invocation.command: payload}),

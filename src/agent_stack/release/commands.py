@@ -10,6 +10,9 @@ from typing import cast
 
 from agent_stack._vendor import yaml
 from agent_stack.cli.production import ProductionCommand, production_owner_bindings
+from agent_stack.cli.production import _authorize_running_release
+from agent_stack.reconcile.production import compose_sync
+from agent_stack.release.manifest import VerifiedRelease
 
 from .errors import LifecycleFailure
 
@@ -20,6 +23,7 @@ def _data_root() -> Path:
 
 def run_doctor(payload: object) -> Mapping[str, object]:
     command = cast(ProductionCommand, payload)
+    release = cast(VerifiedRelease, _authorize_running_release())
     policy_path = _data_root() / "release/trust-policy.yaml"
     policy = yaml.safe_load(policy_path.read_text(encoding="utf-8"))  # type: ignore[no-untyped-call]
     if not isinstance(policy, Mapping):
@@ -28,14 +32,21 @@ def run_doctor(payload: object) -> Mapping[str, object]:
             "packaged trust policy is invalid",
             exit_code=30,
         )
-    manifest = command.repository_root / ".agent-workflow/Manifest.json"
+    manifest = command.repository_root / ".agent-workflow/manifest.json"
+    authority = compose_sync(
+        command,
+        release,
+        apply=False,
+        data_root=_data_root(),
+    )
     return MappingProxyType(
         {
             "schema_id": "agent-workflow.doctor-result",
             "schema_version": 1,
             "repository_root": str(command.repository_root),
-            "initialized": manifest.is_file(),
-            "manifest_path": ".agent-workflow/Manifest.json",
+            "initialized": manifest.is_file() and authority.get("no_op") is True,
+            "manifest_path": ".agent-workflow/manifest.json",
+            "authority_verified": True,
             "existing_trellis": (command.repository_root / ".trellis").exists(),
             "existing_specify": (command.repository_root / ".specify").exists(),
             "trust_policy": {
@@ -55,4 +66,3 @@ def run_upgrade(payload: object) -> object:
         "upgrade requires an initialized project and verified candidate release",
         exit_code=21,
     )
-

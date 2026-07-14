@@ -5,6 +5,8 @@ from pathlib import Path
 import pytest
 
 from agent_stack.cli.parser import CLIUsageError, parse_launcher_envelope
+from agent_stack.cli.parser import parse_cli_args
+from agent_stack.cli.production import compose_production_runtime_context
 
 
 def _envelope(root: Path) -> list[str]:
@@ -66,3 +68,22 @@ def test_normal_public_invocation_has_no_launcher_authority() -> None:
 
     assert invocation is None
     assert public == ("doctor", "--json")
+
+
+def test_verified_launcher_fields_are_bound_to_the_production_owner_payload(
+    tmp_path: Path,
+) -> None:
+    launcher, public = parse_launcher_envelope(_envelope(tmp_path))
+    assert launcher is not None
+    invocation = parse_cli_args(public)
+
+    context = compose_production_runtime_context(
+        invocation,
+        repository_root=launcher.project_root,
+        caller_context_version=launcher.caller_context_version,
+        caller_fields=launcher.caller_fields,
+    )
+    payload = context.owner_payloads["doctor"]
+
+    assert payload.caller_context_version == 1
+    assert payload.caller_fields == launcher.caller_fields

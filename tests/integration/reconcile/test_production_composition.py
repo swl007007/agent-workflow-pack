@@ -8,6 +8,7 @@ from types import MappingProxyType
 from agent_stack.cli.parser import CommandInvocation
 from agent_stack.cli.production import ProductionCommand
 from agent_stack.reconcile import commands
+from agent_stack.release import commands as release_commands
 from agent_stack.reconcile.production_bundle import load_production_bundle
 from agent_stack.release.identity import ReleaseIdentity
 from agent_stack.release.manifest import VerifiedRelease
@@ -117,6 +118,10 @@ def test_init_apply_uses_real_bundle_and_commits_complete_project_contract(
     (project / "AGENTS.md").write_text("User instructions stay.\n", encoding="utf-8")
     monkeypatch.setattr(commands, "_data_root", lambda: data_root)
     monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    monkeypatch.setattr(release_commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(
+        release_commands, "_authorize_running_release", _verified_release
+    )
 
     result = commands.run_init(_command(project, dry_run=False))
 
@@ -133,6 +138,11 @@ def test_init_apply_uses_real_bundle_and_commits_complete_project_contract(
     assert (project / ".agent-workflow/manifest.json").is_file()
     assert (project / ".agent-workflow/local/workspace.json").is_file()
     assert (project / ".agent-workflow/local/approval-replay.json").is_file()
+    doctor = release_commands.run_doctor(
+        _command(project, dry_run=False, command="doctor")
+    )
+    assert doctor["initialized"] is True
+    assert doctor["authority_verified"] is True
 
     manifest_path = project / ".agent-workflow/manifest.json"
     generation = json.loads(manifest_path.read_text(encoding="utf-8"))["generation"]
