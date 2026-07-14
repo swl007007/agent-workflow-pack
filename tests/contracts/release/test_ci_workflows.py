@@ -20,6 +20,17 @@ def step_runs(job: dict[str, object]) -> list[str]:
     return [str(step.get("run", "")) for step in steps if isinstance(step, dict)]
 
 
+def assert_frozen_uv(job: dict[str, object]) -> None:
+    steps = job["steps"]
+    assert isinstance(steps, list)
+    setup = next(
+        step
+        for step in steps
+        if isinstance(step, dict) and step.get("uses") == "astral-sh/setup-uv@v6"
+    )
+    assert setup.get("with") == {"version": "0.11.28"}
+
+
 def complete_acceptance_command(commands: list[str]) -> str:
     return next(
         command
@@ -47,6 +58,7 @@ def test_ci_matrix_covers_python_311_through_314_and_artifact_gates() -> None:
     assert isinstance(matrix, dict)
 
     assert matrix["python-version"] == ["3.11", "3.12", "3.13", "3.14"]
+    assert_frozen_uv(test_job)
     commands = step_runs(test_job)
     assert next(i for i, value in enumerate(commands) if "generate_notices.py --check" in value) < next(
         i for i, value in enumerate(commands) if "build_artifacts.py" in value
@@ -62,6 +74,8 @@ def test_release_workflow_orders_build_gate_manifest_publish_and_reverify() -> N
     build = jobs["build-and-gate"]
     publish = jobs["publish-immutable"]
     assert isinstance(build, dict) and isinstance(publish, dict)
+    assert_frozen_uv(build)
+    assert_frozen_uv(publish)
     assert publish["needs"] == "build-and-gate"
     build_commands = step_runs(build)
     publish_commands = step_runs(publish)

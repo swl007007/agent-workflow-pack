@@ -372,7 +372,11 @@ def _require_production_integration(root: Path, artifact_set_digest: str) -> dic
         or document.get("status") != "passed"
         or document.get("artifact_set_digest") != artifact_set_digest
     ):
-        raise _failure("production integration prerequisite does not bind final artifacts")
+        raise _failure(
+            "production integration prerequisite does not bind final artifacts",
+            expected_artifact_set_digest=document.get("artifact_set_digest"),
+            actual_artifact_set_digest=artifact_set_digest,
+        )
     for field in expected_fields - {
         "schema_id",
         "schema_version",

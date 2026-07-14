@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from agent_stack.release.gates import (
@@ -12,6 +13,7 @@ from agent_stack.release.gates import (
     run_release_gates,
     verify_release_artifact_set,
 )
+from agent_stack.release.errors import LifecycleFailure
 
 
 def main() -> int:
@@ -28,7 +30,11 @@ def main() -> int:
         artifact_set = build_release_artifacts(
             root, root / "dist", rebuild=not arguments.record_existing
         )
-    result = run_release_gates(artifact_set)
+    try:
+        result = run_release_gates(artifact_set)
+    except LifecycleFailure as error:
+        print(json.dumps(error.to_document(), sort_keys=True), file=sys.stderr)
+        raise
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0
 
