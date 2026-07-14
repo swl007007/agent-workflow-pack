@@ -201,6 +201,31 @@ def _replay_document(project_id: str, workspace_instance_id: str) -> dict[str, o
     }
 
 
+def build_first_init_local_state(
+    manifest: Mapping[str, object],
+    layout: VerifiedTrellisTaskLayout,
+    workspace_instance_id: str,
+    expected_replay_digest: str,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Build the two local-state candidates committed by first init."""
+    project_id, contract = _validate_manifest(manifest, layout)
+    normalized_workspace_id = _canonical_uuid(
+        workspace_instance_id, "workspace_instance_id"
+    )
+    expected_digest = _sha256(expected_replay_digest, "expected_replay_digest")
+    workspace = _workspace_document(
+        manifest,
+        layout,
+        project_id,
+        normalized_workspace_id,
+        contract,
+    )
+    replay = _replay_document(project_id, normalized_workspace_id)
+    if hashlib.sha256(canonical_json_bytes(replay)).hexdigest() != expected_digest:
+        raise _registration_failure("empty replay candidate digest changed")
+    return workspace, replay
+
+
 def _absent(path: str) -> FileState:
     return FileState(path, False, "absent", CANONICAL_NULL, CANONICAL_NULL, True)
 

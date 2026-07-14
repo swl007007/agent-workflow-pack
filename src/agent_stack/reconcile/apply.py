@@ -31,6 +31,7 @@ from .models import FileState
 from .plan import render_candidate_manifest
 from .ports import TaskQuiescenceScannerPort
 from .probes import run_write_probe
+from agent_stack.runtime.workspace import build_first_init_local_state
 
 
 def _crash_at(point: str) -> None:
@@ -126,7 +127,11 @@ def _is_true_noop(envelope: SavedPlanEnvelope) -> bool:
     )
 
 
-def _file_records(envelope: SavedPlanEnvelope) -> list[dict[str, object]]:
+def _file_records(
+    envelope: SavedPlanEnvelope,
+    candidate_manifest: Mapping[str, object],
+    target_layout: VerifiedTrellisTaskLayout,
+) -> list[dict[str, object]]:
     candidate_states = {
         str(raw["path"]): FileState.from_document(_mapping(raw, "candidate file state"))
         for raw in _sequence(
@@ -168,6 +173,43 @@ def _file_records(envelope: SavedPlanEnvelope) -> list[dict[str, object]]:
                 "applied": False,
             }
         )
+    if envelope.operation == "init":
+        workspace, replay = build_first_init_local_state(
+            candidate_manifest,
+            target_layout,
+            str(envelope.plan_core["candidate_workspace_instance_id"]),
+            str(envelope.plan_core["empty_replay_ledger_candidate_digest"]),
+        )
+        for path, document in (
+            (".agent-workflow/local/workspace.json", workspace),
+            (".agent-workflow/local/approval-replay.json", replay),
+        ):
+            payload = canonical_json_bytes(document)
+            records.append(
+                {
+                    "path": path,
+                    "original_state": FileState(
+                        path,
+                        False,
+                        "absent",
+                        "canonical-null",
+                        "canonical-null",
+                        True,
+                    ).to_document(),
+                    "candidate_state": FileState(
+                        path,
+                        True,
+                        "regular",
+                        hashlib.sha256(payload).hexdigest(),
+                        "0600",
+                        True,
+                    ).to_document(),
+                    "candidate_content_utf8": payload.decode("utf-8"),
+                    "backup_path": None,
+                    "backup_byte_hash": None,
+                    "applied": False,
+                }
+            )
     return records
 
 
@@ -236,6 +278,10 @@ def _apply_file_records(root: Path, records: list[dict[str, object]]) -> None:
         content = None if raw_content is None else str(raw_content).encode("utf-8")
         compare_and_swap(root, original, candidate, content)
         record["applied"] = True
+        if candidate.path == ".agent-workflow/local/workspace.json":
+            _crash_at("after_workspace")
+        elif candidate.path == ".agent-workflow/local/approval-replay.json":
+            _crash_at("after_replay")
 
 
 def _cleanup_transaction_data(root: Path, records: Sequence[Mapping[str, object]]) -> None:
@@ -329,7 +375,7 @@ def apply_plan(
             scanner, source_layout, target_layout, source_schemas, target_schemas
         )
         _require_same_task_state(initial, expected_task_state)
-        records = _file_records(saved_plan)
+        records = _file_records(saved_plan, candidate_manifest, target_layout)
         created_directories = _created_directories(root, records)
         journal = build_lifecycle_journal(
             saved_plan,
