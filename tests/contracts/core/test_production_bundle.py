@@ -26,7 +26,9 @@ REQUIRED_PRODUCTION_INPUTS = (
     "artifact-definitions/platforms/codex-agents.yaml",
     "artifact-definitions/platforms/codex-skill.yaml",
     "artifact-definitions/platforms/codex-wrapper.yaml",
+    "artifact-definitions/platforms/project-gitignore.yaml",
     "templates/control/runtime-control.json.tmpl",
+    "templates/control/gitignore-block.tmpl",
 )
 
 
@@ -66,7 +68,7 @@ def test_production_bundle_validates_closed_schemas_references_and_actual_eviden
     assert bundle.profile["id"] == "default"
     assert bundle.catalog["schema_id"] == "agent-workflow.catalog"
     assert bundle.workflow_lock["components"]
-    assert len(bundle.artifact_definitions) == 3
+    assert len(bundle.artifact_definitions) == 4
     assert {row["unit_id"] for row in bundle.runtime_unit_evidence} == {
         row["unit_id"] for row in bundle.runtime_unit_inventory["units"]
     }

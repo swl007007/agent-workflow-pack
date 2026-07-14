@@ -1,0 +1,12 @@
+schema_id: agent-workflow.artifact-definition
+schema_version: 1
+id: project-gitignore
+source: templates/control/gitignore-block.tmpl
+targets:
+  - path: .gitignore
+    ownership: overlay-managed
+    merge_strategy: marked-block
+    mode_policy: preserve
+    markers: {begin: "# BEGIN AGENT-WORKFLOW-PACK EPHEMERAL", end: "# END AGENT-WORKFLOW-PACK EPHEMERAL"}
+forbidden_paths: []
+validators: [{id: utf8-text-v1, version: 1}, {id: newline-v1, version: 1}]

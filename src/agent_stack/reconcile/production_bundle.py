@@ -157,7 +157,12 @@ def load_production_bundle(root: Path) -> ProductionBundle:
         raise _failure("packaged Trellis discovery input is not an object")
     definitions = tuple(
         _load_yaml(root / f"artifact-definitions/platforms/{name}.yaml")
-        for name in ("codex-agents", "codex-skill", "codex-wrapper")
+        for name in (
+            "codex-agents",
+            "codex-skill",
+            "codex-wrapper",
+            "project-gitignore",
+        )
     )
 
     resolve_profile((profile,), "default")

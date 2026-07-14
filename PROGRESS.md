@@ -4,6 +4,7 @@
 - Branch: `fix/rc2-production-composition`
 - Worktree: `/mnt/c/Users/swl00/IFPRI Dropbox/Weilun Shi/Plan/.worktrees/agent-workflow-pack-rc2`
 - Release status: blocked; no RC4 or final tag is authorized.
+- Execution approval: subsequent implementation waves are pre-approved through the release gate; stop before tagging, pushing, or publishing.
 
 ## Completed
 

@@ -99,6 +99,7 @@ def test_init_dry_run_uses_the_closed_production_bundle_without_writes(
     assert result["planned_paths"] == [
         ".agent-workflow/bin/codex-wrapper",
         ".agents/skills/agent-workflow/SKILL.md",
+        ".gitignore",
         "AGENTS.md",
     ]
     assert result["writes_performed"] == 0

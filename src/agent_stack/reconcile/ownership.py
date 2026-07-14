@@ -373,11 +373,12 @@ def plan_ownership(
             end_token = end.encode("utf-8") + b"\n"
             if (
                 old_record is None
-                and content is not None
-                and content.count(begin_token) == 0
-                and content.count(end_token) == 0
+                and (content is None or content.count(begin_token) == 0)
+                and (content is None or content.count(end_token) == 0)
             ):
-                prefix = content + (b"" if not content or content.endswith(b"\n") else b"\n")
+                prefix = (content or b"") + (
+                    b"" if not content or content.endswith(b"\n") else b"\n"
+                )
                 block = b""
                 suffix = b""
                 initial_overlay_insert = True
@@ -426,7 +427,7 @@ def plan_ownership(
                 True,
                 "regular",
                 hashlib.sha256(candidate_bytes).hexdigest(),
-                observed.mode,
+                "0644" if not observed.exists else observed.mode,
                 True,
                 candidate_block_hash,
             )
