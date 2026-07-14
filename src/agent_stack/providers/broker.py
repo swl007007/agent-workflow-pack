@@ -13,6 +13,7 @@ import struct
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from multiprocessing.process import BaseProcess
 
 from agent_stack.core.api import canonical_json_bytes
 
@@ -119,7 +120,7 @@ class TrustedBroker:
     store: AttemptStore
     attempt_id: str
     release_token_digest: str
-    process: multiprocessing.Process
+    process: BaseProcess
     control_write: int
     ack_read: int
     liveness_identity: str
@@ -138,7 +139,7 @@ class TrustedBroker:
         control_read, control_write = os.pipe()
         ack_read, ack_write = os.pipe()
         parent_pid = os.getpid()
-        process = multiprocessing.Process(
+        process = multiprocessing.get_context("fork").Process(
             target=_broker_main,
             args=(
                 control_read,
