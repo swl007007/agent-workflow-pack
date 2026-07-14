@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.provider-attempts",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": ["agent-workflow.provider-attempt.v1"],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "workspace_instance_id", "provider_plan_digest", "prospective_transaction_id", "approval_digest", "attempts"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.provider-attempts"},
+    "schema_version": {"const": 1},
+    "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+    "provider_plan_digest": {"$ref": "#/definitions/sha256"},
+    "prospective_transaction_id": {"$ref": "#/definitions/uuid"},
+    "approval_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "canonical-null"}]},
+    "attempts": {"type": "array", "items": {"$ref": "#/definitions/attempt"}}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f-]{36}$"},
+    "attempt": {
+      "type": "object",
+      "required": ["attempt_id", "state", "release_token_digest", "broker_liveness_identity", "prepared_at", "release_deadline", "command_digest", "isolation_measurements"],
+      "properties": {
+        "attempt_id": {"$ref": "#/definitions/uuid"},
+        "state": {"enum": ["prepared", "released", "succeeded", "failed", "interrupted"]},
+        "release_token_digest": {"$ref": "#/definitions/sha256"},
+        "broker_liveness_identity": {"type": "string", "minLength": 1},
+        "prepared_at": {"type": "string", "minLength": 1},
+        "release_deadline": {"type": "string", "minLength": 1},
+        "command_digest": {"$ref": "#/definitions/sha256"},
+        "isolation_measurements": {"type": "object"},
+        "released_at": {"type": "string"},
+        "terminal_at": {"type": "string"},
+        "result_category": {"type": "string"},
+        "sanitized_output_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "canonical-null"}]},
+        "candidate_output_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "canonical-null"}]}
+      },
+      "additionalProperties": false
+    }
+  }
+}
