@@ -98,7 +98,8 @@ if [ ! -f "$uvx_path" ] || [ ! -x "$uvx_path" ] || [ -L "$uvx_path" ]; then
   fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: uv or uvx path is unsupported'
 fi
 uv_version_output=$($uvx_path --version 2>/dev/null || true)
-uv_version=${uv_version_output##* }
+uv_version=${uv_version_output#* }
+uv_version=${uv_version%% *}
 case "$uv_version" in
   0.[789].*|0.[1-9][0-9].*) ;;
   *) fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: uv or uvx version is unsupported' ;;

@@ -43,6 +43,7 @@ def _bootstrap_tools(
     capture: Path,
     *,
     uv_exit: int = 0,
+    uv_version_output: str = "uvx 0.7.17",
     include_python: bool = True,
     uv_symlink: bool = False,
 ) -> Path:
@@ -54,7 +55,7 @@ def _bootstrap_tools(
     _write_executable(
         real_uv,
         "#!/bin/sh\n"
-        "if [ \"${1-}\" = --version ]; then echo 'uvx 0.7.17'; exit 0; fi\n"
+        f"if [ \"${{1-}}\" = --version ]; then echo {uv_version_output!r}; exit 0; fi\n"
         f"{env_executable} | {sort_executable} > {str(capture)!r}\n"
         f"printf 'ARG=<%s>\\n' \"$@\" >> {str(capture)!r}\n"
         f"exit {uv_exit}\n",
@@ -72,6 +73,25 @@ def _bootstrap_tools(
     for utility in ("env", "mkdir"):
         shutil.copy2(shutil.which(utility) or f"/usr/bin/{utility}", tools / utility)
     return tools
+
+
+def test_launcher_accepts_modern_uv_version_with_platform_suffix(tmp_path: Path) -> None:
+    project = tmp_path / "project"
+    project.mkdir()
+    launcher = _render_launcher(project)
+    capture = tmp_path / "capture.txt"
+    tools = _bootstrap_tools(
+        tmp_path,
+        capture,
+        uv_version_output="uvx 0.11.28 (x86_64-unknown-linux-gnu)",
+    )
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = _run(launcher, tools, home, "doctor")
+
+    assert result.returncode == 0, result.stderr
+    assert capture.is_file()
 
 
 def _run(

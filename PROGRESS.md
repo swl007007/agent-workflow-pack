@@ -1,16 +1,16 @@
-# v0.1.7 Durable First-Install Handoff Progress
+# v0.1.8 uv Version Parser Closure Progress
 
-- Branch: `fix/v0.1.7-durable-handoff`
+- Branch: `fix/v0.1.8-uv-version-parser`
 - Worktree: `/tmp/awp-v015-canonical-first-install`
 - Approved design: `docs/superpowers/specs/2026-07-14-v015-canonical-first-install-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-07-14-v015-canonical-first-install.md`
-- Current task: durable-handoff final verification before release gate
+- Current task: modern uv/uvx version parsing and release re-freeze
 - Baseline: focused publication/workflow tests passed at `9398465`
-- Release rule: no manual publication fallback; postpublication failure freezes `v0.1.7` and advances to `v0.1.8`.
-- Completed: v0.1.6 failed-release record, canonical bootstrap-to-init handoff, durable launcher probe, 15th gate, and automated postpublication dogfood contract.
-- Focused verification: 14 tests passed; Ruff and mypy passed; installed-wheel production dogfood passed.
-- Full verification: Ruff passed; mypy passed; 706 tests passed; 15/15 prepublication gates passed.
-- Frozen candidate artifact set: `c244d8cf573f0d95387eadfdb5c946589a33673cb38e44684f2157162cf24bda`.
-- Wheel: `30b9cf4130bef1324709323cf8172d5e5fa1cc8fd472fd67c81680622f790498`.
-- sdist: `0a5d369943604d00ad2b535e9baa5d7d432ed0fb23aecf10ffda8353e950d7c3`.
-- Render digest: `d3d6c3f08c1b09ca62be32efe0e8f53f0c6142c6410dd6bbfdfae6213e062718`.
+- Release rule: no manual publication fallback; postpublication failure freezes `v0.1.8` and advances to `v0.1.9`.
+- Completed: v0.1.7 immutable failure diagnosis and RED/GREEN coverage for modern uv/uvx platform-suffixed version output.
+- Focused verification: launcher/release suite passed (19 tests); installed-wheel production dogfood passed.
+- Full verification: Ruff passed; mypy passed; 707 tests passed; 15/15 prepublication gates passed.
+- Frozen candidate artifact set: `26082fcd30226667e49d6faf0dddef94f45c9db383034b2c06d5cd5e142db76a`.
+- Wheel: `db85f06beff3a3188146e5234dd8e77022586259dd769adda1ba53ecc43a71da`.
+- sdist: `491e38443b0e340ab95ae4a792dfb72adaeef0ed24fd02c30637aa74c2e10614`.
+- Render digest: `6b73cb0e3a6532266bd95f8f9d449596727870ef1d0bea68605d934704c4a8df`.
