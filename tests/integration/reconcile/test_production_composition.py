@@ -228,6 +228,37 @@ def test_init_apply_uses_real_bundle_and_commits_complete_project_contract(
     } == before
 
 
+def test_production_upgrade_defaults_to_exact_running_release_no_op(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+    monkeypatch.setattr(release_commands, "_authorize_running_release", _verified_release)
+    monkeypatch.setattr(release_commands, "_data_root", lambda: data_root)
+
+    result = release_commands.run_upgrade(
+        ProductionCommand(
+            invocation=CommandInvocation(
+                command="upgrade",
+                options=MappingProxyType({"target": None, "dry_run": False}),
+                json_output=True,
+                debug=False,
+            ),
+            repository_root=project,
+        )
+    )
+
+    assert result["target_release_id"] == _verified_release().identity.release_id
+    assert result["committed"] is False
+    assert result["no_op"] is True
+    assert result["transaction_id"] is None
+
+
 def test_production_workspace_register_recreates_clone_local_contract(
     tmp_path: Path, monkeypatch
 ) -> None:

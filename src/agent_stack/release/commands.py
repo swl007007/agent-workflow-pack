@@ -15,6 +15,10 @@ from agent_stack.reconcile.production import compose_sync
 from agent_stack.release.manifest import VerifiedRelease
 
 from .errors import LifecycleFailure
+from .distribution import UpgradeResult
+from .compatibility import RuntimeJournalReference
+from .manifest import discover_release_locator, verify_release_manifest
+from .trust import PackagedTrustPolicy
 
 
 def _data_root() -> Path:
@@ -61,8 +65,46 @@ def run_doctor(payload: object) -> Mapping[str, object]:
 
 
 def run_upgrade(payload: object) -> object:
+    command = cast(ProductionCommand, payload)
+    installed = cast(VerifiedRelease, _authorize_running_release())
+    compose_sync(command, installed, apply=False, data_root=_data_root())
+    target = command.invocation.options.get("target")
+    if target is None or target == installed.identity.version:
+        return MappingProxyType(
+            UpgradeResult(
+                transaction_id=None,
+                target_release_id=installed.identity.release_id,
+                recovery_runtime=RuntimeJournalReference(
+                    "committed",
+                    installed.identity.release_id,
+                    installed.manifest_digest,
+                ),
+                committed=False,
+                no_op=True,
+            ).to_document()
+        )
+    if not isinstance(target, str) or not target:
+        raise LifecycleFailure(
+            "AWP_RELEASE_UPGRADE_INPUT_REQUIRED",
+            "upgrade target version is invalid",
+            exit_code=21,
+        )
+    policy_document = yaml.safe_load(  # type: ignore[no-untyped-call]
+        (_data_root() / "release/trust-policy.yaml").read_text(encoding="utf-8")
+    )
+    if not isinstance(policy_document, Mapping):
+        raise LifecycleFailure(
+            "AWP_RELEASE_TRUST_POLICY_INVALID",
+            "packaged trust policy is invalid",
+            exit_code=30,
+        )
+    policy = PackagedTrustPolicy.from_document(policy_document)
+    candidate = verify_release_manifest(
+        discover_release_locator(target, policy), policy
+    )
     raise LifecycleFailure(
-        "AWP_RELEASE_UPGRADE_INPUT_REQUIRED",
-        "upgrade requires an initialized project and verified candidate release",
-        exit_code=21,
+        "AWP_UPGRADE_APPROVAL_REQUIRED",
+        "verified upgrade candidate requires an exact approved saved plan",
+        exit_code=22,
+        details={"target_release_id": candidate.identity.release_id},
     )
