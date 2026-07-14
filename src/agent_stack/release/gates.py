@@ -55,6 +55,7 @@ _GATE_IDS: Final = (
     "complete-suite-contract",
     "immutable-publication-ready",
     "canonical-first-install-publication",
+    "first-install-durable-handoff",
     "license-provenance-notices",
 )
 
@@ -537,6 +538,10 @@ def run_release_gates(artifact_set: ReleaseArtifactSet) -> dict[str, object]:
                     artifact_set.git_inventory
                 ),
             },
+        ),
+        _gate(
+            "first-install-durable-handoff",
+            {"project_launcher_created_by": "init", "handoff_probe": "doctor"},
         ),
         _gate("license-provenance-notices", provenance.provenance_lock_digest),
     ]

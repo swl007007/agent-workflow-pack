@@ -126,9 +126,28 @@ def test_release_body_is_complete_deterministic_projection() -> None:
     ).sha256(command.encode()).hexdigest()
 
 
+def test_canonical_command_completes_init_and_hands_off_to_project_launcher() -> None:
+    release = _release()
+    command = render_canonical_first_install_shell(release, release.manifest_digest)
+
+    assert "run_exact_cli()" in command
+    ordered = [
+        "run_exact_cli bootstrap --json",
+        "run_exact_cli init --dry-run --json",
+        "run_exact_cli init --json",
+        'project_launcher="$project_root/.agent-workflow/bin/agent-stack"',
+        '"$project_launcher" doctor --json',
+    ]
+    positions = [command.index(value) for value in ordered]
+    assert positions == sorted(positions)
+    assert '[ -x "$project_launcher" ] || exit 30' in command
+    assert "exec \"$env_path\"" not in command
+
+
 def test_release_gate_registry_includes_canonical_first_install_publication() -> None:
     assert "canonical-first-install-publication" in gates._GATE_IDS
-    assert len(gates._GATE_IDS) == 14
+    assert "first-install-durable-handoff" in gates._GATE_IDS
+    assert len(gates._GATE_IDS) == 15
 
 
 def test_renderer_inventory_check_reads_logical_file_paths() -> None:

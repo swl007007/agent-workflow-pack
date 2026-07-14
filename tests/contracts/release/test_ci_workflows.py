@@ -113,13 +113,17 @@ def test_release_workflow_orders_build_gate_manifest_publish_and_reverify() -> N
     reverify_index = next(
         i for i, value in enumerate(publish_commands) if "verify_published_release.py" in value
     )
-    assert verify_index < publish_index < reverify_index
+    dogfood_index = next(
+        i for i, value in enumerate(publish_commands) if "postpublication_dogfood.py" in value
+    )
+    assert verify_index < publish_index < reverify_index < dogfood_index
     assert "immutable" in repr(publish).casefold()
     publication_steps = [
         step
         for step in publish["steps"]
         if "publish_release.py" in str(step.get("run", ""))
         or "verify_published_release.py" in str(step.get("run", ""))
+        or "postpublication_dogfood.py" in str(step.get("run", ""))
     ]
     assert publication_steps
     assert all(

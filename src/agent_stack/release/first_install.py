@@ -148,13 +148,21 @@ direct_confirmation=false
 caller_tty="stdin=$stdin_tty,stdout=$stdout_tty,stderr=$stderr_tty,direct_confirmation_capable=$direct_confirmation"
 bootstrap_path=${{uvx_path%/*}}:${{python_path%/*}}:${{env_path%/*}}:${{mkdir_path%/*}}
 wheel_requirement=$wheel_url#sha256=$wheel_sha256
-exec "$env_path" -i PATH="$bootstrap_path" HOME="$bootstrap_home" LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC \
-  "$uvx_path" --isolated --no-config --no-env-file --no-index \
-  --keyring-provider disabled --no-sources --no-build --no-python-downloads \
-  --python "$python_path" --cache-dir "$uv_cache" --from "$wheel_requirement" agent-stack \
-  --bootstrap-project "$project_root" --caller-context-version 1 \
-  --caller-platform unknown --caller-user-home "$caller_home" --caller-tty "$caller_tty" \
-  bootstrap --json
+run_exact_cli() {{
+  "$env_path" -i PATH="$bootstrap_path" HOME="$bootstrap_home" LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC \
+    "$uvx_path" --isolated --no-config --no-env-file --no-index \
+    --keyring-provider disabled --no-sources --no-build --no-python-downloads \
+    --python "$python_path" --cache-dir "$uv_cache" --from "$wheel_requirement" agent-stack \
+    --bootstrap-project "$project_root" --caller-context-version 1 \
+    --caller-platform unknown --caller-user-home "$caller_home" --caller-tty "$caller_tty" \
+    "$@"
+}}
+run_exact_cli bootstrap --json
+run_exact_cli init --dry-run --json
+run_exact_cli init --json
+project_launcher="$project_root/.agent-workflow/bin/agent-stack"
+[ -x "$project_launcher" ] || exit 30
+"$project_launcher" doctor --json
 """
 
 

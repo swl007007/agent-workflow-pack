@@ -84,3 +84,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.IMMUTABLE_RELEASE_TOKEN }}
         run: uv run python tools/release/verify_published_release.py --version "${{ inputs.version }}"
+      - name: Run postpublication durable-handoff dogfood
+        env:
+          GITHUB_TOKEN: ${{ secrets.IMMUTABLE_RELEASE_TOKEN }}
+        run: uv run python tools/release/postpublication_dogfood.py --version "${{ inputs.version }}"
