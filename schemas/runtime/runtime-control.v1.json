@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.runtime-control",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.runtime-control.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "launcher_contract_version",
+    "launcher_renderer_version",
+    "release_id",
+    "release_manifest_digest",
+    "wheel_url",
+    "wheel_sha256",
+    "uv_version_range",
+    "python_version_range",
+    "render_digest"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.runtime-control"},
+    "schema_version": {"const": 1},
+    "launcher_contract_version": {"const": 1},
+    "launcher_renderer_version": {"const": "runtime-launcher-v1"},
+    "release_id": {"$ref": "#/definitions/sha256"},
+    "release_manifest_digest": {"$ref": "#/definitions/sha256"},
+    "wheel_url": {"type": "string", "pattern": "^https://[^\\r\\n]+\\.whl$"},
+    "wheel_sha256": {"$ref": "#/definitions/sha256"},
+    "uv_version_range": {"const": ">=0.7.0,<1.0.0"},
+    "python_version_range": {"const": ">=3.11,<3.15"},
+    "render_digest": {"$ref": "#/definitions/sha256"}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

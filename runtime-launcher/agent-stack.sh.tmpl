@@ -1,0 +1,190 @@
+#!/bin/sh
+set -eu
+
+launcher_contract_version='{{launcher_contract_version}}'
+launcher_renderer_version='{{launcher_renderer_version}}'
+release_id='{{release_id}}'
+release_manifest_digest='{{release_manifest_digest}}'
+wheel_url='{{wheel_url}}'
+wheel_sha256='{{wheel_sha256}}'
+
+fail() {
+  code=$1
+  shift
+  printf '%s\n' "$*" >&2
+  exit "$code"
+}
+
+for argument in "$@"; do
+  case "$argument" in
+    --bootstrap-*|--caller-*)
+      fail 2 'reserved launcher argument is not accepted from the command line'
+      ;;
+  esac
+done
+
+case "$0" in
+  /*) launcher_path=$0 ;;
+  *) launcher_path=$PWD/$0 ;;
+esac
+if [ -L "$launcher_path" ]; then
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: launcher must not be a symlink'
+fi
+launcher_name=${launcher_path##*/}
+launcher_dir=${launcher_path%/*}
+launcher_dir=$(cd -P "$launcher_dir" 2>/dev/null && pwd -P) ||
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: launcher directory is invalid'
+launcher_path=$launcher_dir/$launcher_name
+if [ "$launcher_name" != agent-stack ] || [ "${launcher_dir##*/}" != bin ]; then
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: launcher path is invalid'
+fi
+control_dir=${launcher_dir%/*}
+if [ "${control_dir##*/}" != .agent-workflow ]; then
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: launcher path is invalid'
+fi
+project_dir=${control_dir%/*}
+project_root=$(cd -P "$project_dir" 2>/dev/null && pwd -P) ||
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: project root is invalid'
+if [ "$launcher_path" != "$project_root/.agent-workflow/bin/agent-stack" ]; then
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: launcher path aliases the project root'
+fi
+
+caller_home=${HOME-}
+case "$caller_home" in
+  /*) ;;
+  *) fail 2 'AWP_CALLER_CONTEXT_INVALID: HOME must be absolute' ;;
+esac
+caller_platform=${AWP_CALLER_PLATFORM-unknown}
+case "$caller_platform" in
+  codex|claude|opencode|unknown) ;;
+  *) fail 2 'AWP_CALLER_CONTEXT_INVALID: caller platform is unsupported' ;;
+esac
+caller_config=${CODEX_HOME-}
+if [ -n "$caller_config" ]; then
+  case "$caller_config" in
+    /*) ;;
+    *) fail 2 'AWP_CALLER_CONTEXT_INVALID: caller config root must be absolute' ;;
+  esac
+fi
+caller_harness=${AWP_CALLER_HARNESS-}
+if [ -n "$caller_harness" ]; then
+  case "$caller_harness" in
+    /*) ;;
+    *) fail 2 'AWP_CALLER_CONTEXT_INVALID: caller harness must be absolute' ;;
+  esac
+  if [ ! -f "$caller_harness" ] || [ ! -x "$caller_harness" ] || [ -L "$caller_harness" ]; then
+    fail 2 'AWP_CALLER_CONTEXT_INVALID: caller harness is not a supported executable'
+  fi
+fi
+
+stdin_tty=false
+stdout_tty=false
+stderr_tty=false
+[ -t 0 ] && stdin_tty=true || true
+[ -t 1 ] && stdout_tty=true || true
+[ -t 2 ] && stderr_tty=true || true
+direct_confirmation=false
+if [ "$stdin_tty" = true ] && [ "$stdout_tty" = true ]; then
+  direct_confirmation=true
+fi
+caller_tty="stdin=$stdin_tty,stdout=$stdout_tty,stderr=$stderr_tty,direct_confirmation_capable=$direct_confirmation"
+
+uvx_path=$(command -v uvx 2>/dev/null || command -v uv 2>/dev/null || true)
+case "$uvx_path" in
+  /*) ;;
+  *) fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: supported uv or uvx is absent' ;;
+esac
+if [ ! -f "$uvx_path" ] || [ ! -x "$uvx_path" ] || [ -L "$uvx_path" ]; then
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: uv or uvx path is unsupported'
+fi
+uv_version_output=$($uvx_path --version 2>/dev/null || true)
+uv_version=${uv_version_output##* }
+case "$uv_version" in
+  0.[789].*|0.[1-9][0-9].*) ;;
+  *) fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: uv or uvx version is unsupported' ;;
+esac
+
+python_path=
+for python_name in python3.14 python3.13 python3.12 python3.11; do
+  candidate=$(command -v "$python_name" 2>/dev/null || true)
+  case "$candidate" in
+    /*) ;;
+    *) continue ;;
+  esac
+  if [ ! -f "$candidate" ] || [ ! -x "$candidate" ] || [ -L "$candidate" ]; then
+    continue
+  fi
+  python_version=$($candidate -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || true)
+  case "$python_version" in
+    3.11|3.12|3.13|3.14)
+      python_path=$candidate
+      break
+      ;;
+  esac
+done
+if [ -z "$python_path" ]; then
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: compatible local Python is absent'
+fi
+
+env_path=$(command -v env 2>/dev/null || true)
+mkdir_path=$(command -v mkdir 2>/dev/null || true)
+case "$env_path:$mkdir_path" in
+  /*:/*) ;;
+  *) fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: POSIX env or mkdir is absent' ;;
+esac
+cache_root=$caller_home/.cache/agent-workflow-pack
+bootstrap_home=$cache_root/bootstrap-home
+uv_cache=$cache_root/uv-cache
+$mkdir_path -p "$bootstrap_home" "$uv_cache" ||
+  fail 30 'AWP_RUNTIME_BOOTSTRAP_PREREQUISITE_MISSING: controlled cache is unavailable'
+
+uv_dir=${uvx_path%/*}
+python_dir=${python_path%/*}
+env_dir=${env_path%/*}
+mkdir_dir=${mkdir_path%/*}
+bootstrap_path=$uv_dir:$python_dir:$env_dir:$mkdir_dir
+wheel_requirement=$wheel_url#sha256=$wheel_sha256
+probe_id=$caller_platform-version-v1
+
+if [ -n "$caller_config" ] && [ -n "$caller_harness" ]; then
+  exec "$env_path" -i \
+    PATH="$bootstrap_path" HOME="$bootstrap_home" \
+    LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC \
+    "$uvx_path" \
+    --isolated --no-config --no-env-file --no-index \
+    --keyring-provider disabled --no-sources --no-build --no-python-downloads \
+    --python "$python_path" --cache-dir "$uv_cache" \
+    --from "$wheel_requirement" agent-stack \
+    --bootstrap-project "$project_root" --caller-context-version 1 \
+    --caller-platform "$caller_platform" --caller-user-home "$caller_home" \
+    --caller-config-root "codex_home=$caller_config" \
+    --caller-harness-executable "$caller_harness" \
+    --caller-harness-version-probe-id "$probe_id" --caller-tty "$caller_tty" \
+    "$@"
+fi
+if [ -n "$caller_harness" ]; then
+  exec "$env_path" -i \
+    PATH="$bootstrap_path" HOME="$bootstrap_home" \
+    LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC \
+    "$uvx_path" \
+    --isolated --no-config --no-env-file --no-index \
+    --keyring-provider disabled --no-sources --no-build --no-python-downloads \
+    --python "$python_path" --cache-dir "$uv_cache" \
+    --from "$wheel_requirement" agent-stack \
+    --bootstrap-project "$project_root" --caller-context-version 1 \
+    --caller-platform "$caller_platform" --caller-user-home "$caller_home" \
+    --caller-harness-executable "$caller_harness" \
+    --caller-harness-version-probe-id "$probe_id" --caller-tty "$caller_tty" \
+    "$@"
+fi
+exec "$env_path" -i \
+  PATH="$bootstrap_path" HOME="$bootstrap_home" \
+  LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC \
+  "$uvx_path" \
+  --isolated --no-config --no-env-file --no-index \
+  --keyring-provider disabled --no-sources --no-build --no-python-downloads \
+  --python "$python_path" --cache-dir "$uv_cache" \
+  --from "$wheel_requirement" agent-stack \
+  --bootstrap-project "$project_root" --caller-context-version 1 \
+  --caller-platform "$caller_platform" --caller-user-home "$caller_home" \
+  --caller-tty "$caller_tty" "$@"
