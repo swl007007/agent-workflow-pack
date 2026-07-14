@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.task-findings",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "findings"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.task-findings"},
+    "schema_version": {"const": 1},
+    "findings": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {"$ref": "#/definitions/layoutAmbiguous"},
+          {"$ref": "#/definitions/unknownEntry"},
+          {"$ref": "#/definitions/collision"},
+          {"$ref": "#/definitions/scanLimit"},
+          {"$ref": "#/definitions/interpretationConflict"},
+          {"$ref": "#/definitions/unfinishedTransaction"},
+          {"$ref": "#/definitions/nonArchivedTask"},
+          {"$ref": "#/definitions/strandedState"}
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "surfacePin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface_id", "surface_digest"],
+      "properties": {
+        "surface_id": {"type": "string", "minLength": 1},
+        "surface_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "layoutAmbiguous": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "normalized_path", "evidence_class", "parser_id", "parser_version", "evidence_schema_id", "evidence_schema_version"],
+      "properties": {
+        "kind": {"const": "layout-ambiguous"}, "finding_id": {"type": "string", "minLength": 1},
+        "normalized_path": {"type": "string", "minLength": 1}, "evidence_class": {"type": "string", "minLength": 1},
+        "parser_id": {"type": "string", "minLength": 1}, "parser_version": {"type": "integer", "minimum": 1},
+        "evidence_schema_id": {"type": "string", "minLength": 1}, "evidence_schema_version": {"type": "integer", "minimum": 1}
+      }
+    },
+    "unknownEntry": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "normalized_path", "root_contract_id"],
+      "properties": {"kind": {"const": "unknown-entry"}, "finding_id": {"type": "string", "minLength": 1}, "normalized_path": {"type": "string", "minLength": 1}, "root_contract_id": {"type": "string", "minLength": 1}}
+    },
+    "collision": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "normalized_aliases", "collision_class"],
+      "properties": {"kind": {"const": "collision"}, "finding_id": {"type": "string", "minLength": 1}, "normalized_aliases": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}}, "collision_class": {"type": "string", "minLength": 1}}
+    },
+    "scanLimit": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "contract_id", "limit_kind", "configured_limit"],
+      "properties": {"kind": {"const": "scan-limit"}, "finding_id": {"type": "string", "minLength": 1}, "contract_id": {"type": "string", "minLength": 1}, "limit_kind": {"type": "string", "minLength": 1}, "configured_limit": {"type": "integer", "minimum": 1}}
+    },
+    "interpretationConflict": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "task_id", "task_ref", "current_path", "conflicting_fields"],
+      "properties": {"kind": {"const": "interpretation-conflict"}, "finding_id": {"type": "string", "minLength": 1}, "task_id": {"type": "string", "pattern": "^[0-9a-f-]{36}$"}, "task_ref": {"type": "string", "minLength": 1}, "current_path": {"type": "string", "minLength": 1}, "conflicting_fields": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}}
+    },
+    "unfinishedTransaction": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "journal_path", "task_id", "task_ref", "operation", "phase"],
+      "properties": {"kind": {"const": "unfinished-task-transaction"}, "finding_id": {"type": "string", "minLength": 1}, "journal_path": {"type": "string", "minLength": 1}, "task_id": {"type": "string", "pattern": "^[0-9a-f-]{36}$"}, "task_ref": {"type": "string", "minLength": 1}, "operation": {"type": "string", "minLength": 1}, "phase": {"type": "string", "minLength": 1}}
+    },
+    "nonArchivedTask": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "task_id", "current_path", "lifecycle_status", "mode", "pinned_surfaces"],
+      "properties": {"kind": {"const": "non-archived-task"}, "finding_id": {"type": "string", "minLength": 1}, "task_id": {"type": "string", "pattern": "^[0-9a-f-]{36}$"}, "current_path": {"type": "string", "minLength": 1}, "lifecycle_status": {"enum": ["admitting", "active", "blocked", "completed", "archiving"]}, "mode": {"enum": ["trellis-native", "speckit-superpowers"]}, "pinned_surfaces": {"type": "array", "items": {"$ref": "#/definitions/surfacePin"}}}
+    },
+    "strandedState": {
+      "type": "object", "additionalProperties": false,
+      "required": ["kind", "finding_id", "normalized_path", "semantic_role", "source_visibility", "target_visibility"],
+      "properties": {"kind": {"const": "layout-state-stranded"}, "finding_id": {"type": "string", "minLength": 1}, "normalized_path": {"type": "string", "minLength": 1}, "semantic_role": {"type": "string", "minLength": 1}, "source_visibility": {"enum": ["recognized", "unrecognized"]}, "target_visibility": {"enum": ["recognized", "unrecognized"]}}
+    }
+  }
+}

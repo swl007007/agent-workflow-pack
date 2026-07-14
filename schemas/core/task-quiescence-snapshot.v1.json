@@ -1,0 +1,140 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.task-quiescence-snapshot",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.task-quiescence.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "source_layout_digest",
+    "target_layout_digest",
+    "source_schema_bundle_digest",
+    "target_schema_bundle_digest",
+    "tasks",
+    "metadata",
+    "task_journals",
+    "finding_ids",
+    "task_quiescence_digest"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.task-quiescence-snapshot"},
+    "schema_version": {"const": 1},
+    "source_layout_digest": {"$ref": "#/definitions/sha256"},
+    "target_layout_digest": {"$ref": "#/definitions/sha256"},
+    "source_schema_bundle_digest": {"$ref": "#/definitions/sha256"},
+    "target_schema_bundle_digest": {"$ref": "#/definitions/sha256"},
+    "tasks": {"type": "array", "items": {"$ref": "#/definitions/task"}},
+    "metadata": {"type": "array", "items": {"$ref": "#/definitions/metadata"}},
+    "task_journals": {"type": "array", "items": {"$ref": "#/definitions/journal"}},
+    "finding_ids": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "task_quiescence_digest": {"$ref": "#/definitions/sha256"}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "surfacePin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface_id", "surface_digest"],
+      "properties": {
+        "surface_id": {"type": "string", "minLength": 1},
+        "surface_digest": {"$ref": "#/definitions/sha256"}
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "admission_task_ref",
+        "current_path",
+        "source_role",
+        "target_role",
+        "integration_byte_hash",
+        "integration_mode",
+        "integration_schema_id",
+        "integration_schema_version",
+        "lifecycle_status",
+        "revision",
+        "mode",
+        "task_contract_digest",
+        "task_contract_surfaces"
+      ],
+      "properties": {
+        "task_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+        "admission_task_ref": {"type": "string", "minLength": 1},
+        "current_path": {"type": "string", "minLength": 1},
+        "source_role": {"enum": ["absent", "active", "archive"]},
+        "target_role": {"enum": ["absent", "active", "archive"]},
+        "integration_byte_hash": {"$ref": "#/definitions/sha256"},
+        "integration_mode": {"type": "string", "pattern": "^0[0-7]{3}$"},
+        "integration_schema_id": {"type": "string", "minLength": 1},
+        "integration_schema_version": {"type": "integer", "minimum": 1},
+        "lifecycle_status": {"enum": ["admitting", "active", "blocked", "completed", "archiving", "archived"]},
+        "revision": {"type": "integer", "minimum": 0},
+        "mode": {"enum": ["trellis-native", "speckit-superpowers"]},
+        "task_contract_digest": {"$ref": "#/definitions/sha256"},
+        "task_contract_surfaces": {"type": "array", "items": {"$ref": "#/definitions/surfacePin"}}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "byte_hash",
+        "mode",
+        "parser_id",
+        "parser_version",
+        "classifier_id",
+        "classifier_version",
+        "parsed_task_refs",
+        "semantic_role",
+        "classification"
+      ],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "byte_hash": {"$ref": "#/definitions/sha256"},
+        "mode": {"type": "string", "pattern": "^0[0-7]{3}$"},
+        "parser_id": {"type": "string", "minLength": 1},
+        "parser_version": {"type": "integer", "minimum": 1},
+        "classifier_id": {"type": "string", "minLength": 1},
+        "classifier_version": {"type": "integer", "minimum": 1},
+        "parsed_task_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "semantic_role": {"type": "string", "minLength": 1},
+        "classification": {"enum": ["empty", "nonempty"]}
+      }
+    },
+    "journal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "journal_path",
+        "byte_hash",
+        "mode",
+        "schema_id",
+        "schema_version",
+        "operation",
+        "phase",
+        "task_id",
+        "task_ref",
+        "terminal"
+      ],
+      "properties": {
+        "journal_path": {"type": "string", "minLength": 1},
+        "byte_hash": {"$ref": "#/definitions/sha256"},
+        "mode": {"type": "string", "pattern": "^0[0-7]{3}$"},
+        "schema_id": {"type": "string", "minLength": 1},
+        "schema_version": {"type": "integer", "minimum": 1},
+        "operation": {"type": "string", "minLength": 1},
+        "phase": {"type": "string", "minLength": 1},
+        "task_id": {"type": "string", "pattern": "^[0-9a-f-]{36}$"},
+        "task_ref": {"type": "string", "minLength": 1},
+        "terminal": {"type": "boolean"}
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.workspace-diagnostic",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.workspace-diagnostic.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "workspace_state", "command_admission", "secondary_diagnostics", "workspace_diagnostic_digest"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.workspace-diagnostic"},
+    "schema_version": {"const": 1},
+    "workspace_state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["relationship", "relationship_evidence", "discovery_evidence", "task_quiescence", "primary_state_blocker"],
+      "properties": {
+        "relationship": {"enum": ["matching", "migration-required", "ahead", "diverged", "unknown"]},
+        "relationship_evidence": {"enum": ["verified", "missing", "invalid"]},
+        "discovery_evidence": {"enum": ["verified", "missing", "unsupported", "invalid"]},
+        "task_quiescence": {"enum": ["not-evaluated", "quiescent", "blocked", "ambiguous"]},
+        "primary_state_blocker": {"type": ["string", "null"]}
+      }
+    },
+    "command_admission": {
+      "type": "object", "additionalProperties": false,
+      "required": ["command", "allowed", "blocker"],
+      "properties": {"command": {"type": "string", "minLength": 1}, "allowed": {"type": "boolean"}, "blocker": {"type": ["string", "null"]}}
+    },
+    "secondary_diagnostics": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "workspace_diagnostic_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
