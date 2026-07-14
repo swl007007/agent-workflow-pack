@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from importlib.resources import files
 from pathlib import Path
 from types import MappingProxyType
 from typing import cast
 
-from agent_stack._vendor import yaml
 from agent_stack.cli.production import ProductionCommand, _authorize_running_release
 
 from .errors import RendererFailure
+from .production_bundle import load_production_bundle
 
 
 def _data_root() -> Path:
@@ -19,21 +19,20 @@ def _data_root() -> Path:
 
 
 def _planned_paths() -> list[str]:
-    document = yaml.safe_load(  # type: ignore[no-untyped-call]
-        (_data_root() / "artifact-definitions/platforms/codex.yaml").read_text(
-            encoding="utf-8"
-        )
-    )
-    if not isinstance(document, Mapping) or not isinstance(document.get("targets"), list):
-        raise RendererFailure("AWP_OWNERSHIP_CONFLICT", "packaged artifact definition is invalid")
-    paths = [str(target["path"]) for target in document["targets"] if isinstance(target, Mapping)]
-    paths.extend(
-        [
-            ".agent-workflow/Manifest.json",
-            ".agent-workflow/bin/agent-stack",
-            ".agent-workflow/runtime-control.json",
-        ]
-    )
+    bundle = load_production_bundle(_data_root())
+    paths: list[str] = []
+    for definition in bundle.artifact_definitions:
+        targets = definition.get("targets")
+        if not isinstance(targets, Sequence) or isinstance(targets, (str, bytes)):
+            raise RendererFailure(
+                "AWP_OWNERSHIP_CONFLICT", "packaged artifact targets are invalid"
+            )
+        for target in targets:
+            if not isinstance(target, Mapping) or not isinstance(target.get("path"), str):
+                raise RendererFailure(
+                    "AWP_OWNERSHIP_CONFLICT", "packaged artifact target is invalid"
+                )
+            paths.append(str(target["path"]))
     return sorted(paths)
 
 

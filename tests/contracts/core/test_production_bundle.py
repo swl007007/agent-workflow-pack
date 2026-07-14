@@ -4,6 +4,7 @@ from pathlib import Path
 
 from agent_stack._vendor import yaml
 from agent_stack.reconcile.production_bundle import load_production_bundle
+from agent_stack.runtime.scanner import NormativeTaskScanner
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -15,6 +16,8 @@ REQUIRED_PRODUCTION_INPUTS = (
     "catalog/workflow.lock",
     "catalog/runtime-surfaces.yaml",
     "catalog/runtime-units.yaml",
+    "catalog/trellis-task-layout.json",
+    "catalog/trellis-discovery-schemas.json",
     "templates/platforms/codex/AGENTS.md.tmpl",
     "templates/platforms/codex/SKILL.md.tmpl",
     "templates/platforms/codex/codex-wrapper.tmpl",
@@ -65,3 +68,21 @@ def test_production_bundle_validates_closed_schemas_references_and_actual_eviden
         row["unit_id"] for row in bundle.runtime_unit_inventory["units"]
     }
     assert all(row["byte_hash"] != "0" * 64 for row in bundle.runtime_unit_evidence)
+    assert bundle.trellis_layout.layout_digest
+    assert bundle.discovery_schemas.schema_bundle_digest
+
+
+def test_packaged_trellis_contract_drives_the_real_scanner(tmp_path: Path) -> None:
+    bundle = load_production_bundle(ROOT)
+
+    result = NormativeTaskScanner(tmp_path)(
+        bundle.trellis_layout,
+        bundle.trellis_layout,
+        bundle.discovery_schemas,
+        bundle.discovery_schemas,
+    )
+
+    assert result.snapshot["tasks"] == []
+    assert result.snapshot["metadata"] == []
+    assert result.snapshot["task_journals"] == []
+    assert result.findings["findings"] == []

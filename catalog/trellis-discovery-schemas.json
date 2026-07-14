@@ -1,0 +1,147 @@
+{
+  "schemas": [
+    {
+      "schema_id": "agent-workflow.integration",
+      "schema_version": 1,
+      "format": "yaml",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_version", "mode", "workflow_contract", "lifecycle", "admission"],
+        "properties": {
+          "schema_version": {"const": 1},
+          "mode": {"enum": ["trellis-native", "speckit-superpowers"]},
+          "workflow_contract": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "version", "profile_digest_at_admission", "lock_digest_at_admission",
+              "artifact_bundle_digest_at_admission", "policy_digest_at_admission",
+              "adapter_id", "adapter_version_at_admission", "route_contract_version",
+              "task_contract_surfaces"
+            ],
+            "properties": {
+              "version": {"const": 1},
+              "profile_digest_at_admission": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "lock_digest_at_admission": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "artifact_bundle_digest_at_admission": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "policy_digest_at_admission": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "adapter_id": {"type": "string", "minLength": 1},
+              "adapter_version_at_admission": {"type": "string", "minLength": 1},
+              "route_contract_version": {"type": "integer", "minimum": 1},
+              "task_contract_surfaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["surface_id", "surface_digest"],
+                  "properties": {
+                    "surface_id": {"type": "string", "minLength": 1},
+                    "surface_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+                  }
+                }
+              }
+            }
+          },
+          "lifecycle": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "state_revision"],
+            "properties": {
+              "status": {"enum": ["admitting", "active", "blocked", "completed", "archiving", "archived"]},
+              "state_revision": {"type": "integer", "minimum": 0}
+            }
+          },
+          "admission": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["task_id", "task_ref"],
+            "properties": {
+              "task_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+              "task_ref": {"type": "string", "minLength": 1}
+            }
+          }
+        }
+      }
+    },
+    {
+      "schema_id": "trellis.active-pointer",
+      "schema_version": 1,
+      "format": "json",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_id", "schema_version", "task_ref"],
+        "properties": {
+          "schema_id": {"const": "trellis.active-pointer"},
+          "schema_version": {"const": 1},
+          "task_ref": {"type": ["string", "null"]}
+        }
+      }
+    },
+    {
+      "schema_id": "trellis.session-journal",
+      "schema_version": 1,
+      "format": "json",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_id", "schema_version", "task_ref"],
+        "properties": {
+          "schema_id": {"const": "trellis.session-journal"},
+          "schema_version": {"const": 1},
+          "task_ref": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    {
+      "schema_id": "agent-workflow.task-transaction",
+      "schema_version": 1,
+      "format": "json",
+      "schema": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["schema_id", "schema_version", "operation", "phase", "task_id", "task_ref"],
+        "properties": {
+          "schema_id": {"const": "agent-workflow.task-transaction"},
+          "schema_version": {"const": 1},
+          "operation": {"enum": ["admit", "claim", "transition", "release", "archive"]},
+          "phase": {"type": "string", "minLength": 1},
+          "task_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+          "task_ref": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  ],
+  "parsers": [
+    {"parser_id": "json-object-v1", "parser_version": 1, "format": "json"}
+  ],
+  "classifiers": [
+    {
+      "classifier_id": "trellis-active-pointer-v1",
+      "classifier_version": 1,
+      "strategy": "task-refs-empty",
+      "canonical_empty_state_id": "no-active-task"
+    },
+    {
+      "classifier_id": "trellis-session-v1",
+      "classifier_version": 1,
+      "strategy": "task-refs-empty",
+      "canonical_empty_state_id": "no-sessions"
+    }
+  ],
+  "phase_classifiers": [
+    {
+      "classifier_id": "task-transaction-phase-v1",
+      "classifier_version": 1,
+      "operations": {
+        "admit": ["planned", "staged", "task_moved", "metadata_applied", "admission_committed", "cleanup_pending", "complete"],
+        "claim": ["planned", "integration_committed", "cleanup_pending", "complete"],
+        "transition": ["planned", "integration_committed", "cleanup_pending", "complete"],
+        "release": ["planned", "integration_committed", "cleanup_pending", "complete"],
+        "archive": ["planned", "state_marked", "task_moved", "metadata_applied", "archive_committed", "cleanup_pending", "complete"]
+      },
+      "terminal_phases": ["complete"]
+    }
+  ]
+}

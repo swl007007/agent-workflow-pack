@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
 
 from agent_stack._vendor import yaml
-from agent_stack.core.api import digest
-from agent_stack.core.artifact_policy import validate_artifact_definitions
+from agent_stack.core.api import (
+    VerifiedDiscoverySchemas,
+    VerifiedTrellisTaskLayout,
+    canonical_json_bytes,
+    digest,
+)
+from agent_stack.core.artifact_policy import validate_artifact_definitions, validate_trellis_layout
 from agent_stack.core.catalog import normalize_workflow_lock
 from agent_stack.core.profile import resolve_profile
 from agent_stack.core.surfaces import validate_surface_registry
@@ -27,6 +33,8 @@ class ProductionBundle:
     runtime_unit_evidence: tuple[Mapping[str, object], ...]
     artifact_definitions: tuple[Mapping[str, object], ...]
     template_root: Path
+    trellis_layout: VerifiedTrellisTaskLayout
+    discovery_schemas: VerifiedDiscoverySchemas
 
 
 def _failure(message: str, **details: object) -> RendererFailure:
@@ -100,6 +108,21 @@ def _evidence(root: Path, inventory: Mapping[str, object]) -> tuple[Mapping[str,
     return tuple(sorted(rows, key=lambda row: str(row["unit_id"])))
 
 
+def _artifact_targets(
+    definitions: tuple[Mapping[str, object], ...],
+) -> tuple[str, ...]:
+    paths: list[str] = []
+    for definition in definitions:
+        targets = definition.get("targets")
+        if not isinstance(targets, list):
+            raise _failure("artifact definition targets are invalid")
+        for target in targets:
+            if not isinstance(target, Mapping) or not isinstance(target.get("path"), str):
+                raise _failure("artifact definition target is invalid")
+            paths.append(str(target["path"]))
+    return tuple(paths)
+
+
 def load_production_bundle(root: Path) -> ProductionBundle:
     """Validate production inputs from a repository root or installed data root."""
 
@@ -109,6 +132,17 @@ def load_production_bundle(root: Path) -> ProductionBundle:
     workflow_lock = _load_yaml(root / "catalog/workflow.lock")
     registry = _load_yaml(root / "catalog/runtime-surfaces.yaml")
     inventory = _load_yaml(root / "catalog/runtime-units.yaml")
+    try:
+        layout_document = json.loads(
+            (root / "catalog/trellis-task-layout.json").read_text(encoding="utf-8")
+        )
+        discovery_document = json.loads(
+            (root / "catalog/trellis-discovery-schemas.json").read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeError, ValueError) as error:
+        raise _failure("packaged Trellis discovery input cannot be loaded") from error
+    if not isinstance(layout_document, Mapping) or not isinstance(discovery_document, Mapping):
+        raise _failure("packaged Trellis discovery input is not an object")
     definitions = tuple(
         _load_yaml(root / f"artifact-definitions/platforms/{name}.yaml")
         for name in ("codex-agents", "codex-skill", "codex-wrapper")
@@ -118,6 +152,14 @@ def load_production_bundle(root: Path) -> ProductionBundle:
     normalize_workflow_lock(workflow_lock)
     validate_artifact_definitions(definitions)
     validate_surface_registry(registry, inventory)
+    trellis_layout = validate_trellis_layout(
+        layout_document,
+        artifact_targets=_artifact_targets(definitions),
+    )
+    discovery_schemas = VerifiedDiscoverySchemas(
+        hashlib.sha256(canonical_json_bytes(discovery_document)).hexdigest(),
+        discovery_document,
+    )
     for definition in definitions:
         source = definition.get("source")
         if not isinstance(source, str) or not (root / source).is_file():
@@ -132,6 +174,8 @@ def load_production_bundle(root: Path) -> ProductionBundle:
         runtime_unit_evidence=_evidence(root, inventory),
         artifact_definitions=definitions,
         template_root=root / "templates",
+        trellis_layout=trellis_layout,
+        discovery_schemas=discovery_schemas,
     )
 
 
