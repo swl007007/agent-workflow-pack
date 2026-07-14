@@ -12,12 +12,13 @@
 - Packaged Trellis layout/discovery schemas and real scanner binding: commit `ed3dd3a`.
 - Complete release authority preserved across Core Resolver: commit `85f5cb1`.
 - Real packaged-bundle init composition and safe first overlay insertion: commit `c94fdda` plus the current production-init increment.
+- Project launcher, runtime-control descriptor, and workflow lock committed under exact Reconciler control authority: commit `974d762`.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
 ## In Progress
 
-- Extend the completed production init path with managed launcher/runtime-control/workflow-lock artifacts, then implement strict no-op sync.
+- Implement production sync from committed Manifest/workspace/runtime-control/workflow-lock authority and prove strict second-sync no-op.
 
 ## Remaining
 
@@ -29,4 +30,4 @@
 
 ## Resume
 
-Add RED assertions for `.agent-workflow/bin/agent-stack`, `runtime-control.json`, and the project workflow lock. Render them from `launcher_contract_from_release()` and packaged bytes, include them in ownership/Manifest authority, then use those committed contracts to implement production sync and strict second-sync no-op.
+Add a RED chain that runs sync dry-run, sync apply, and a second sync apply after production init. Load and validate the committed Manifest/workspace/runtime-control/workflow-lock, derive current authority/surface vectors, and require the unchanged second sync to return `no_op: true` without journal or Manifest generation changes.
