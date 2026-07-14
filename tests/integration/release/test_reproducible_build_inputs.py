@@ -27,11 +27,13 @@ def test_deterministic_gzip_has_fixed_stored_block_framing() -> None:
     )
 
 
-def _archives(root: Path, stamp: int) -> tuple[Path, Path]:
+def _archives(root: Path, stamp: int, mode: int) -> tuple[Path, Path]:
     root.mkdir(parents=True)
     wheel = root / "package.whl"
     with zipfile.ZipFile(wheel, "w") as archive:
         info = zipfile.ZipInfo("package/value.txt", (2020, 1, 1, 0, 0, stamp))
+        info.create_system = 3
+        info.external_attr = mode << 16
         archive.writestr(info, b"stable\n")
     sdist = root / "package.tar.gz"
     with gzip.GzipFile(filename=str(sdist), mode="wb", mtime=stamp) as compressed:
@@ -39,13 +41,14 @@ def _archives(root: Path, stamp: int) -> tuple[Path, Path]:
             info = tarfile.TarInfo("package/value.txt")
             info.size = len(b"stable\n")
             info.mtime = stamp
+            info.mode = mode
             archive.addfile(info, io.BytesIO(b"stable\n"))
     return wheel, sdist
 
 
 def test_archive_normalization_removes_source_container_metadata(tmp_path: Path) -> None:
-    first = _archives(tmp_path / "first", 2)
-    second = _archives(tmp_path / "second", 4)
+    first = _archives(tmp_path / "first", 2, 0o755)
+    second = _archives(tmp_path / "second", 4, 0o644)
 
     for pair in (first, second):
         _normalize_distribution_archives(*pair)

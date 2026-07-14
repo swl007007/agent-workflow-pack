@@ -32,7 +32,7 @@
 - A real built-and-installed wheel/sdist now passes the no-context-injection console chain `bootstrap → init --dry-run → init → doctor → test-routing → sync --dry-run → sync → sync` with HTTPS replaced only at the test transport boundary. It proves 17 owners, routing policy, user-file preservation, and strict repeated-sync no-op.
 - `doctor --write-probe` now creates a durable ignored-local probe transaction before target mutation; normal completion records exact evidence, while `recover --probe` cleans only recorded byte-identical residue and explicitly resumes or rolls back under project locks.
 - Final verification passed from the release-gate commit candidate: Ruff, `mypy src`, runtime vendor lock, generated notices, 686 pytest tests, rebuilt wheel/sdist inventory, production-integration prerequisite, and all 13 release gates.
-- Reproducible candidate identities: artifact set `32846384a650d9a3329101ff7f44c38e3f832c0aafcba8df4ad7e44f37bbf3fc`; wheel `d7b70c74c79a29abb79467fbf04a0df653e2fc75405965a9ec7fcb847af8364e`; sdist `81a79e37dd9a6e0d87b43886174c4d472d149cc600960d9e14f954e87040df59`.
+- Reproducible candidate identities: artifact set `06a5254beecde1b716870cf7f1602e00c98ae76cc1d7bc6e4f81acab4add2722`; wheel `9e3d35ace68f58cf7dba5aafb764a9e9937cb3774ff8daafe90339c5419ab485`; sdist `2dac6da4ed72c8528ef18195cd87651407c9e4b9482e5bdd16667d9875484eec`.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Focused release-authority and console verification: 9 tests passed; Ruff and mypy passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.

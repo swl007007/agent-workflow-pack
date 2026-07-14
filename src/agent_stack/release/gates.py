@@ -259,21 +259,18 @@ def _deterministic_gzip(body: bytes) -> bytes:
 
 
 def _normalize_distribution_archives(wheel_path: Path, sdist_path: Path) -> None:
-    wheel_records: list[tuple[str, bytes, bool]] = []
+    wheel_records: list[tuple[str, bytes]] = []
     with zipfile.ZipFile(wheel_path) as archive:
         for zip_info in archive.infolist():
-            executable = bool((zip_info.external_attr >> 16) & 0o111)
-            wheel_records.append(
-                (zip_info.filename, archive.read(zip_info), executable)
-            )
+            wheel_records.append((zip_info.filename, archive.read(zip_info)))
     wheel_candidate = wheel_path.with_suffix(wheel_path.suffix + ".normalized")
     with zipfile.ZipFile(wheel_candidate, "w", compression=zipfile.ZIP_STORED) as archive:
-        for name, wheel_body, executable in sorted(wheel_records):
+        for name, wheel_body in sorted(wheel_records):
             normalized_zip = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
             normalized_zip.create_system = 3
             normalized_zip.compress_type = zipfile.ZIP_STORED
             normalized_zip.external_attr = (
-                ((0o755 if executable else 0o644) & 0xFFFF) << 16
+                ((0o755 if name.endswith("/") else 0o644) & 0xFFFF) << 16
             )
             archive.writestr(normalized_zip, wheel_body)
     wheel_candidate.replace(wheel_path)
@@ -297,7 +294,9 @@ def _normalize_distribution_archives(wheel_path: Path, sdist_path: Path) -> None
             normalized_tar = tarfile.TarInfo(original.name)
             normalized_tar.type = original.type
             normalized_tar.linkname = original.linkname
-            normalized_tar.mode = original.mode
+            normalized_tar.mode = (
+                0o755 if original.isdir() else 0o777 if original.issym() else 0o644
+            )
             normalized_tar.uid = 0
             normalized_tar.gid = 0
             normalized_tar.uname = ""
