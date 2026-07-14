@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.task-outbox",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.task-outbox.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "effect_id", "operation", "task_id", "transaction_id", "effect_kind", "handler_id", "handler_version", "payload", "payload_digest", "idempotency_key", "created_at", "delivery"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.task-outbox"},
+    "schema_version": {"const": 1},
+    "effect_id": {"$ref": "#/$defs/sha256"},
+    "operation": {"type": "string", "minLength": 1},
+    "task_id": {"$ref": "#/$defs/uuid"},
+    "transaction_id": {"$ref": "#/$defs/uuid"},
+    "effect_kind": {"type": "string", "minLength": 1},
+    "handler_id": {"type": "string", "minLength": 1},
+    "handler_version": {"type": "string", "minLength": 1},
+    "payload": {},
+    "payload_digest": {"$ref": "#/$defs/sha256"},
+    "idempotency_key": {"$ref": "#/$defs/sha256"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "attempt_count", "last_attempt_at", "delivered_at", "failure"],
+      "properties": {
+        "state": {"enum": ["pending", "delivered", "failed"]},
+        "attempt_count": {"type": "integer", "minimum": 0},
+        "last_attempt_at": {"type": ["string", "null"], "format": "date-time"},
+        "delivered_at": {"type": ["string", "null"], "format": "date-time"},
+        "failure": {
+          "oneOf": [
+            {"type": "null"},
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["error_type", "message"],
+              "properties": {
+                "error_type": {"type": "string", "minLength": 1},
+                "message": {"type": "string"}
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}

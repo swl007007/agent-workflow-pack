@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.integration",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.task-contract.v1"],
+  "oneOf": [
+    {"$ref": "#/$defs/trellisNative"},
+    {"$ref": "#/$defs/speckitSuperpowers"}
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+    "token": {"type": "string", "minLength": 1},
+    "taskRef": {"type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(/|$))(?!.*//)[^\\\\\\u0000-\\u001f\\u007f]+$"},
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["surface_id", "surface_digest"],
+      "properties": {
+        "surface_id": {"$ref": "#/$defs/token"},
+        "surface_digest": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "profile_digest_at_admission", "lock_digest_at_admission", "artifact_bundle_digest_at_admission", "policy_digest_at_admission", "adapter_id", "adapter_version_at_admission", "route_contract_version", "task_contract_surfaces"],
+      "properties": {
+        "version": {"const": 1},
+        "profile_digest_at_admission": {"$ref": "#/$defs/sha256"},
+        "lock_digest_at_admission": {"$ref": "#/$defs/sha256"},
+        "artifact_bundle_digest_at_admission": {"$ref": "#/$defs/sha256"},
+        "policy_digest_at_admission": {"$ref": "#/$defs/sha256"},
+        "adapter_id": {"$ref": "#/$defs/token"},
+        "adapter_version_at_admission": {"$ref": "#/$defs/token"},
+        "route_contract_version": {"const": 1},
+        "task_contract_surfaces": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/surface"}}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "state_revision", "admitted_at", "archived_at", "blocked_reason", "last_transition"],
+      "properties": {
+        "status": {"enum": ["admitting", "active", "blocked", "completed", "archiving", "archived"]},
+        "state_revision": {"type": "integer", "minimum": 1},
+        "admitted_at": {"type": ["string", "null"], "format": "date-time"},
+        "archived_at": {"type": ["string", "null"], "format": "date-time"},
+        "blocked_reason": {"type": ["string", "null"]},
+        "last_transition": {"type": "object"}
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "task_id", "task_ref", "intent_id", "intent_digest", "task_transaction_id", "candidate_tree_digest", "workspace_instance_id_at_admission", "route_decision_id", "route_decision_digest", "approval_id", "approval_challenge", "approval_proof_digest", "approval_verifier_id", "approval_verifier_version", "approved_by", "approval_mechanism", "approved_at"],
+      "properties": {
+        "operation": {"const": "create-integrated-task"},
+        "task_id": {"$ref": "#/$defs/uuid"},
+        "task_ref": {"$ref": "#/$defs/taskRef"},
+        "intent_id": {"$ref": "#/$defs/token"},
+        "intent_digest": {"$ref": "#/$defs/sha256"},
+        "task_transaction_id": {"$ref": "#/$defs/uuid"},
+        "candidate_tree_digest": {"$ref": "#/$defs/sha256"},
+        "workspace_instance_id_at_admission": {"$ref": "#/$defs/uuid"},
+        "route_decision_id": {"$ref": "#/$defs/uuid"},
+        "route_decision_digest": {"$ref": "#/$defs/sha256"},
+        "approval_id": {"$ref": "#/$defs/uuid"},
+        "approval_challenge": {"$ref": "#/$defs/sha256"},
+        "approval_proof_digest": {"$ref": "#/$defs/sha256"},
+        "approval_verifier_id": {"$ref": "#/$defs/token"},
+        "approval_verifier_version": {"$ref": "#/$defs/token"},
+        "approved_by": {"$ref": "#/$defs/token"},
+        "approval_mechanism": {"$ref": "#/$defs/token"},
+        "approved_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "common": {
+      "type": "object",
+      "required": ["schema_version", "mode", "workflow_contract", "lifecycle", "admission"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "mode": {"enum": ["trellis-native", "speckit-superpowers"]},
+        "workflow_contract": {"$ref": "#/$defs/workflow"},
+        "lifecycle": {"$ref": "#/$defs/lifecycle"},
+        "admission": {"$ref": "#/$defs/admission"}
+      }
+    },
+    "trellisNative": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "mode", "workflow_contract", "lifecycle", "admission", "trellis_native"],
+          "properties": {
+            "schema_version": {"const": 1},
+            "mode": {"const": "trellis-native"},
+            "workflow_contract": {"$ref": "#/$defs/workflow"},
+            "lifecycle": {"$ref": "#/$defs/lifecycle"},
+            "admission": {"$ref": "#/$defs/admission"},
+            "trellis_native": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["task_ref"],
+              "properties": {"task_ref": {"$ref": "#/$defs/taskRef"}}
+            }
+          }
+        }
+      ]
+    },
+    "claim": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["claim_id", "executor", "actor", "claimed_at", "base_revision"],
+      "properties": {
+        "claim_id": {"$ref": "#/$defs/uuid"},
+        "executor": {"$ref": "#/$defs/token"},
+        "actor": {"$ref": "#/$defs/token"},
+        "claimed_at": {"type": "string", "format": "date-time"},
+        "base_revision": {"type": "integer", "minimum": 1}
+      }
+    },
+    "heavy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["router_contract_version", "phase", "executor_claim", "authority", "canonical_artifacts", "reference_only_artifacts", "completion_flags"],
+      "properties": {
+        "router_contract_version": {"const": 1},
+        "phase": {"enum": ["specifying", "planning", "implementing", "verifying", "finishing"]},
+        "executor_claim": {"$ref": "#/$defs/claim"},
+        "authority": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["active_feature"],
+          "properties": {"active_feature": {"$ref": "#/$defs/token"}}
+        },
+        "canonical_artifacts": {"type": "object"},
+        "reference_only_artifacts": {"type": "array"},
+        "completion_flags": {"type": "object"}
+      }
+    },
+    "speckitSuperpowers": {
+      "allOf": [
+        {"$ref": "#/$defs/common"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schema_version", "mode", "workflow_contract", "lifecycle", "admission", "speckit_superpowers"],
+          "properties": {
+            "schema_version": {"const": 1},
+            "mode": {"const": "speckit-superpowers"},
+            "workflow_contract": {"$ref": "#/$defs/workflow"},
+            "lifecycle": {"$ref": "#/$defs/lifecycle"},
+            "admission": {"$ref": "#/$defs/admission"},
+            "speckit_superpowers": {"$ref": "#/$defs/heavy"}
+          }
+        }
+      ]
+    }
+  }
+}
