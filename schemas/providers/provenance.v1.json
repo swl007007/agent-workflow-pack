@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.provenance-record",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": ["agent-workflow.provenance-record.v1"],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "component_id", "source_artifact", "license_expression", "license_text_digest", "modified", "modification_notice_digest", "projected_unit_ids", "provenance_digest"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.provenance-record"},
+    "schema_version": {"const": 1},
+    "component_id": {"type": "string", "minLength": 1},
+    "source_artifact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["version", "source_digest", "upstream_path"],
+      "properties": {"version": {"type": "string", "minLength": 1}, "source_digest": {"$ref": "#/definitions/sha256"}, "upstream_path": {"type": "string", "minLength": 1}}
+    },
+    "license_expression": {"type": "string", "minLength": 1},
+    "license_text_digest": {"$ref": "#/definitions/sha256"},
+    "modified": {"type": "boolean"},
+    "modification_notice_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "canonical-null"}]},
+    "projected_unit_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "provenance_digest": {"$ref": "#/definitions/sha256"}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

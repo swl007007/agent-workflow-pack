@@ -352,7 +352,7 @@ class AttemptStore:
                     sanitized_output_digest, "sanitized_output_digest"
                 ),
                 "candidate_output_digest": _digest(
-                    candidate_output_digest, "candidate_output_digest"
+                    candidate_output_digest, "candidate_output_digest", allow_null=True
                 ),
             }
             attempts[index] = terminal

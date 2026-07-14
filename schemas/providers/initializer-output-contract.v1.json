@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.initializer-output-contract",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": ["agent-workflow.initializer-content-root.v1"],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "provider_id", "provider_version", "command_digest", "input_digests", "locale", "timezone", "environment", "umask", "mode_policy_id", "file_order_policy_id", "renderer_id", "renderer_version", "expected_content_root_digest", "timeout_seconds", "max_output_bytes", "max_memory_bytes", "max_cpu_seconds"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.initializer-output-contract"},
+    "schema_version": {"const": 1},
+    "provider_id": {"type": "string", "minLength": 1},
+    "provider_version": {"type": "string", "minLength": 1},
+    "command_digest": {"$ref": "#/definitions/sha256"},
+    "input_digests": {"type": "array", "items": {"$ref": "#/definitions/sha256"}},
+    "locale": {"const": "C.UTF-8"},
+    "timezone": {"const": "UTC"},
+    "environment": {"type": "object", "additionalProperties": {"type": "string"}},
+    "umask": {"const": "0022"},
+    "mode_policy_id": {"const": "posix-mode-v1"},
+    "file_order_policy_id": {"const": "normalized-path-order-v1"},
+    "renderer_id": {"type": "string", "minLength": 1},
+    "renderer_version": {"type": "integer", "minimum": 1},
+    "expected_content_root_digest": {"$ref": "#/definitions/sha256"},
+    "timeout_seconds": {"type": "integer", "minimum": 1},
+    "max_output_bytes": {"type": "integer", "minimum": 1},
+    "max_memory_bytes": {"type": "integer", "minimum": 1},
+    "max_cpu_seconds": {"type": "integer", "minimum": 1}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.acquisition-request",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": [],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "component_id", "source_url", "expected_sha256", "max_download_bytes", "cache_namespace", "archive_policy", "extract"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.acquisition-request"}, "schema_version": {"const": 1},
+    "component_id": {"type": "string", "minLength": 1}, "source_url": {"type": "string", "pattern": "^https://"},
+    "expected_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "max_download_bytes": {"type": "integer", "minimum": 1},
+    "cache_namespace": {"type": "string", "minLength": 1}, "archive_policy": {"type": ["object", "null"]}, "extract": {"type": "boolean"}
+  }
+}

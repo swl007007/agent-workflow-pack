@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.acquisition-result",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": [],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "component_id", "source_digest", "cache_object_path", "archive_evidence_digest", "content_root_digest", "diagnostics_digest", "provenance_records"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.acquisition-result"}, "schema_version": {"const": 1},
+    "component_id": {"type": "string", "minLength": 1}, "source_digest": {"$ref": "#/definitions/sha256"},
+    "cache_object_path": {"type": "string", "minLength": 1}, "archive_evidence_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"type": "null"}]},
+    "content_root_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"type": "null"}]}, "diagnostics_digest": {"$ref": "#/definitions/sha256"},
+    "provenance_records": {"type": "array", "items": {"type": "object"}}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

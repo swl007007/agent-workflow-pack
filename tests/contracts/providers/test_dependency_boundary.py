@@ -11,7 +11,7 @@ STDLIB = {
     "dataclasses", "datetime", "enum", "errno", "fcntl", "functools", "hashlib",
     "hmac", "http", "io", "ipaddress", "json", "locale", "logging", "math",
     "mmap", "multiprocessing", "os", "pathlib", "platform", "queue", "re", "resource", "secrets",
-    "select", "shlex", "shutil", "signal", "socket", "stat", "string", "struct",
+    "select", "selectors", "shlex", "shutil", "signal", "socket", "stat", "string", "struct",
     "subprocess", "sys", "tarfile", "tempfile", "threading", "time", "types",
     "typing", "unicodedata", "urllib", "uuid", "zipfile",
 }

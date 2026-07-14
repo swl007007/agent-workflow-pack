@@ -7,7 +7,7 @@
   "x-digest-domains": [],
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_id", "schema_version", "provider_plan_digest", "approval_digest", "attempt_id", "terminal_state", "containment_evidence_digest", "result_category", "candidate_output_root_digest", "diagnostics_digest", "provenance_records"],
+  "required": ["schema_id", "schema_version", "provider_plan_digest", "approval_digest", "attempt_id", "terminal_state", "containment_evidence_digest", "result_category", "candidate_output_root_digest", "candidate_output_path", "diagnostics_digest", "provenance_records"],
   "properties": {
     "schema_id": {"const": "agent-workflow.provider-execution-result"},
     "schema_version": {"const": 1},
@@ -18,6 +18,7 @@
     "containment_evidence_digest": {"$ref": "#/definitions/sha256"},
     "result_category": {"type": "string", "minLength": 1},
     "candidate_output_root_digest": {"$ref": "#/definitions/sha256"},
+    "candidate_output_path": {"type": "string", "minLength": 1},
     "diagnostics_digest": {"$ref": "#/definitions/sha256"},
     "provenance_records": {"type": "array", "items": {"type": "object"}}
   },

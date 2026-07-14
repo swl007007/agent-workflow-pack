@@ -81,6 +81,7 @@ class ProviderExecutionResult:
     containment_evidence_digest: str
     result_category: str
     candidate_output_root_digest: str
+    candidate_output_path: str
     diagnostics_digest: str
     provenance_records: tuple[Mapping[str, object], ...]
 
@@ -94,6 +95,7 @@ class ProviderExecutionResult:
         containment_evidence_digest: str,
         result_category: str,
         candidate_output_root_digest: str,
+        candidate_output_path: str,
         diagnostics_digest: str,
         provenance_records: tuple[Mapping[str, object], ...],
     ) -> ProviderExecutionResult:
@@ -105,6 +107,7 @@ class ProviderExecutionResult:
             containment_evidence_digest=containment_evidence_digest,
             result_category=result_category,
             candidate_output_root_digest=candidate_output_root_digest,
+            candidate_output_path=candidate_output_path,
             diagnostics_digest=diagnostics_digest,
             provenance_records=provenance_records,
         )
