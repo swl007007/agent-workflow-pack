@@ -4,7 +4,9 @@
 
 **Goal:** Produce and approve six implementation-ready feature specifications from the approved Agent Workflow Pack v0.1 umbrella design before any production code is written.
 
-**Plan status:** Revised draft — review required
+**Plan status:** Approved — decomposition boundary and execution graph frozen
+
+**Approval scope:** This approval authorizes Task 1 feature-spec drafting to begin. It does not approve any feature spec or implementation plan that has not yet been produced and reviewed.
 
 **Architecture:** The approved umbrella design remains the sole cross-feature authority. Each feature spec owns one bounded subsystem, freezes its schemas and callable interfaces, maps its acceptance criteria, and exposes only the contracts needed by later specs. Work proceeds in the exact Section 31 order so later specs consume reviewed interfaces instead of inventing parallel planners, writers, loaders, or trust roots.
 
