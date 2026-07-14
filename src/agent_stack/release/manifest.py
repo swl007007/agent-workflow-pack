@@ -103,6 +103,7 @@ class VerifiedRelease:
     bundles: Mapping[str, str]
     assets: Mapping[str, Mapping[str, object]]
     immutable_release: bool
+    compatibility: Mapping[str, object] | None = None
 
 
 def _parse_json_object(body: bytes, label: str) -> dict[str, object]:

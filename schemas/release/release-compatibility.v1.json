@@ -12,26 +12,56 @@
     "schema_id": {"const": "agent-workflow.release-compatibility"},
     "schema_version": {"const": 1},
     "release_id": {"$ref": "#/definitions/sha256"},
-    "edges": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["from_release_id", "to_release_id", "from_version", "to_version", "trust_policy_digest", "target_bundles", "schema_transitions", "local_state_contracts", "trellis_task_layouts", "migration_ids"],
-        "properties": {
-          "from_release_id": {"$ref": "#/definitions/sha256"},
-          "to_release_id": {"$ref": "#/definitions/sha256"},
-          "from_version": {"type": "string", "minLength": 1},
-          "to_version": {"type": "string", "minLength": 1},
-          "trust_policy_digest": {"$ref": "#/definitions/sha256"},
-          "target_bundles": {"type": "object"},
-          "schema_transitions": {"type": "object"},
-          "local_state_contracts": {"type": "object"},
-          "trellis_task_layouts": {"type": "object"},
-          "migration_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+    "edges": {"type": "array", "items": {"$ref": "#/definitions/edge"}}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "digestPair": {
+      "type": "object", "additionalProperties": false, "required": ["from", "to"],
+      "properties": {"from": {"$ref": "#/definitions/sha256"}, "to": {"$ref": "#/definitions/sha256"}}
+    },
+    "versionPair": {
+      "type": "object", "additionalProperties": false, "required": ["from", "to"],
+      "properties": {"from": {"type": "integer", "minimum": 1}, "to": {"type": "integer", "minimum": 1}}
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from_release_id", "to_release_id", "from_version", "to_version", "trust_policy_digest", "target_bundles", "schema_transitions", "local_state_contracts", "trellis_task_layouts", "migrations"],
+      "properties": {
+        "from_release_id": {"$ref": "#/definitions/sha256"},
+        "to_release_id": {"$ref": "#/definitions/sha256"},
+        "from_version": {"type": "string", "minLength": 1},
+        "to_version": {"type": "string", "minLength": 1},
+        "trust_policy_digest": {"$ref": "#/definitions/sha256"},
+        "target_bundles": {
+          "type": "object", "additionalProperties": false,
+          "required": ["trust_policy", "workflow_lock", "artifact", "schema", "migration", "launcher"],
+          "properties": {
+            "trust_policy": {"$ref": "#/definitions/sha256"}, "workflow_lock": {"$ref": "#/definitions/sha256"},
+            "artifact": {"$ref": "#/definitions/sha256"}, "schema": {"$ref": "#/definitions/sha256"},
+            "migration": {"$ref": "#/definitions/sha256"}, "launcher": {"$ref": "#/definitions/sha256"}
+          }
+        },
+        "schema_transitions": {
+          "type": "object", "additionalProperties": false,
+          "required": ["manifest", "workflow_lock", "integration", "task_transaction", "workspace", "approval_replay", "task_outbox"],
+          "properties": {
+            "manifest": {"$ref": "#/definitions/versionPair"}, "workflow_lock": {"$ref": "#/definitions/versionPair"},
+            "integration": {"$ref": "#/definitions/versionPair"}, "task_transaction": {"$ref": "#/definitions/versionPair"},
+            "workspace": {"$ref": "#/definitions/versionPair"}, "approval_replay": {"$ref": "#/definitions/versionPair"},
+            "task_outbox": {"$ref": "#/definitions/versionPair"}
+          }
+        },
+        "local_state_contracts": {"$ref": "#/definitions/digestPair"},
+        "trellis_task_layouts": {"$ref": "#/definitions/digestPair"},
+        "migrations": {
+          "type": "array", "items": {
+            "type": "object", "additionalProperties": false, "required": ["migration_id", "migration_digest"],
+            "properties": {"migration_id": {"type": "string", "minLength": 1}, "migration_digest": {"$ref": "#/definitions/sha256"}}
+          }
         }
       }
     }
-  },
-  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+  }
 }
