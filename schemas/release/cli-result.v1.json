@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.cli-result",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-6",
+  "x-implementation-owner": "task-6",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "command", "status", "exit_code", "result", "workspace_diagnostic", "errors", "warnings"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.cli-result"},
+    "schema_version": {"const": 1},
+    "command": {"type": "string", "minLength": 1},
+    "status": {"enum": ["success", "blocked", "error"]},
+    "exit_code": {"enum": [0, 2, 20, 21, 22, 23, 30, 31, 40, 70]},
+    "result": {},
+    "workspace_diagnostic": {},
+    "errors": {"type": "array", "items": {"type": "object"}},
+    "warnings": {"type": "array", "items": {"type": "object"}}
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.cli-diagnostic",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-6",
+  "x-implementation-owner": "task-6",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "code", "exit_code", "message", "details"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.cli-diagnostic"},
+    "schema_version": {"const": 1},
+    "code": {"type": "string", "pattern": "^AWP_[A-Z0-9_]+$"},
+    "exit_code": {"enum": [2, 20, 21, 22, 23, 30, 31, 40, 70]},
+    "message": {"type": "string"},
+    "details": {"type": "object"}
+  }
+}
