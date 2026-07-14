@@ -19,6 +19,7 @@ def test_production_owner_bindings_cover_the_closed_command_matrix() -> None:
 
 
 def test_every_lazy_production_owner_target_is_importable() -> None:
+    targets: list[object] = []
     for implementation in _IMPLEMENTATIONS.values():
         closure = implementation.__closure__
         if closure is None:
@@ -26,4 +27,15 @@ def test_every_lazy_production_owner_target_is_importable() -> None:
         captured = [cell.cell_contents for cell in closure]
         module_names = [value for value in captured if isinstance(value, str) and ".commands" in value]
         for module_name in module_names:
-            importlib.import_module(module_name)
+            module = importlib.import_module(module_name)
+            function_names = [
+                value
+                for value in captured
+                if isinstance(value, str) and value.startswith("run_")
+            ]
+            assert len(function_names) == 1
+            target = getattr(module, function_names[0])
+            assert target.__name__ == function_names[0]
+            targets.append(target)
+
+    assert len({id(target) for target in targets}) == len(targets)

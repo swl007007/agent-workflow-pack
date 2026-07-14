@@ -15,6 +15,7 @@
 - Project launcher, runtime-control descriptor, and workflow lock committed under exact Reconciler control authority: commit `974d762`.
 - Production sync reconstructs committed authority and returns strict no-op without mutation: commit `b387e1e`.
 - Reserved launcher envelope is parsed and stripped before public argparse; unsafe/public mixing fails closed in the current increment.
+- All lazy owner targets are now distinct importable functions; Runtime functions still require real state-loader/domain-service binding before closure.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
@@ -32,4 +33,4 @@
 
 ## Resume
 
-Add structural RED tests over all 17 owner bindings, rejecting fixed-failure adapters and exercising representative initialized-project doctor, routing, workspace, task, recovery, and lifecycle commands. Replace placeholders only with real state loaders/domain calls; missing authority must continue to fail closed.
+Add representative initialized-project RED tests for doctor/routing/workspace/task/recovery/lifecycle. Extend `ProductionCommand` with verified caller context from the launcher envelope, then replace Runtime placeholder bodies with state loaders and domain-service requests. Missing authority must continue to fail closed.

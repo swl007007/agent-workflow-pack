@@ -26,15 +26,40 @@ def _task_authority_required(payload: object) -> object:
     )
 
 
-run_workspace_register = _workspace_registration_required
-run_workspace_migrate = _workspace_registration_required
-run_task_runtime_load = _task_authority_required
-run_task_admit = _task_authority_required
-run_task_claim = _task_authority_required
-run_task_transition = _task_authority_required
-run_task_release = _task_authority_required
-run_task_archive = _task_authority_required
-run_task_recover = _task_authority_required
+def run_workspace_register(payload: object) -> object:
+    return _workspace_registration_required(payload)
+
+
+def run_workspace_migrate(payload: object) -> object:
+    return _workspace_registration_required(payload)
+
+
+def run_task_runtime_load(payload: object) -> object:
+    return _task_authority_required(payload)
+
+
+def run_task_admit(payload: object) -> object:
+    return _task_authority_required(payload)
+
+
+def run_task_claim(payload: object) -> object:
+    return _task_authority_required(payload)
+
+
+def run_task_transition(payload: object) -> object:
+    return _task_authority_required(payload)
+
+
+def run_task_release(payload: object) -> object:
+    return _task_authority_required(payload)
+
+
+def run_task_archive(payload: object) -> object:
+    return _task_authority_required(payload)
+
+
+def run_task_recover(payload: object) -> object:
+    return _task_authority_required(payload)
 
 
 __all__ = [
