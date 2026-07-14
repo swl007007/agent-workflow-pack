@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.file-state",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-3",
+  "x-implementation-owner": "task-3",
+  "x-digest-domains": ["agent-workflow.file-state.v1"],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "path", "exists", "file_type", "byte_hash", "mode", "non_symlink", "managed_block_hash"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.file-state"}, "schema_version": {"const": 1},
+    "path": {"type": "string", "minLength": 1}, "exists": {"type": "boolean"},
+    "file_type": {"enum": ["regular", "directory", "absent"]},
+    "byte_hash": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "canonical-null"}]},
+    "mode": {"oneOf": [{"type": "string", "pattern": "^0[0-7]{3}$"}, {"const": "canonical-null"}]},
+    "non_symlink": {"type": "boolean"},
+    "managed_block_hash": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "canonical-null"}]}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

@@ -143,6 +143,27 @@ class TaskGateResult:
     primary_evaluator_blocker: str | None
 
 
+@dataclass(frozen=True)
+class VerifiedDiscoverySchemas:
+    schema_bundle_digest: str
+    normalized: Mapping[str, object]
+
+    def __post_init__(self) -> None:
+        if not _DIGEST.fullmatch(self.schema_bundle_digest):
+            raise ValueError("schema_bundle_digest must be lowercase SHA-256")
+
+
+@dataclass(frozen=True)
+class TaskSnapshotAndFindings:
+    snapshot: Mapping[str, object]
+    findings: Mapping[str, object]
+    task_quiescence_digest: str
+
+    def __post_init__(self) -> None:
+        if not _DIGEST.fullmatch(self.task_quiescence_digest):
+            raise ValueError("task_quiescence_digest must be lowercase SHA-256")
+
+
 def _failure(message: str, **details: object) -> CoreFailure:
     return CoreFailure("AWP_SCHEMA_INVALID", message, details=details)
 

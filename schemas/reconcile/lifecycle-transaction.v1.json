@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.lifecycle-transaction",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-3",
+  "x-implementation-owner": "task-3",
+  "x-digest-domains": ["agent-workflow.lifecycle-transaction.v1"],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "immutable_header", "journal_binding_digest", "task_quiescence_snapshot", "plan_digest", "candidate_manifest_digest", "candidate_manifest", "phase", "file_records", "created_directories", "diagnostics", "rollback_state"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.lifecycle-transaction"}, "schema_version": {"const": 1},
+    "immutable_header": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transaction_id", "operation", "project_id", "workspace_instance_id", "plan_core_digest", "task_quiescence_digest", "baseline_manifest_digest", "candidate_manifest_generation", "recovery_runtime"],
+      "properties": {
+        "transaction_id": {"type": "string"}, "operation": {"enum": ["init", "sync", "repair", "upgrade"]},
+        "project_id": {"type": "string"}, "workspace_instance_id": {"type": "string"},
+        "plan_core_digest": {"$ref": "#/definitions/sha256"}, "task_quiescence_digest": {"$ref": "#/definitions/sha256"},
+        "baseline_manifest_digest": {"$ref": "#/definitions/sha256"}, "candidate_manifest_generation": {"type": "integer", "minimum": 1},
+        "recovery_runtime": {
+          "type": "object", "additionalProperties": false,
+          "required": ["runtime_role", "release_id", "release_manifest_digest"],
+          "properties": {"runtime_role": {"enum": ["committed", "candidate"]}, "release_id": {"$ref": "#/definitions/sha256"}, "release_manifest_digest": {"$ref": "#/definitions/sha256"}}
+        }
+      }
+    },
+    "journal_binding_digest": {"$ref": "#/definitions/sha256"}, "task_quiescence_snapshot": {"type": "object"},
+    "plan_digest": {"$ref": "#/definitions/sha256"}, "candidate_manifest_digest": {"$ref": "#/definitions/sha256"},
+    "candidate_manifest": {"type": "object"},
+    "phase": {"enum": ["planned", "probing", "prepared", "applying", "files_applied", "manifest_committed", "cleanup_pending", "complete"]},
+    "file_records": {"type": "array", "items": {"type": "object"}}, "created_directories": {"type": "array", "items": {"type": "string"}},
+    "diagnostics": {"type": "array", "items": {"type": "object"}}, "rollback_state": {"type": "object"}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

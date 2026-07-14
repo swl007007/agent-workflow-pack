@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.staged-file",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-3",
+  "x-implementation-owner": "task-3",
+  "x-digest-domains": ["agent-workflow.staged-render-tree.v1"],
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "path", "definition_id", "surface_id", "ownership", "merge_strategy", "source_digest", "render_digest", "candidate_byte_hash", "mode_policy", "candidate_mode", "validator_results"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.staged-file"}, "schema_version": {"const": 1},
+    "path": {"type": "string", "minLength": 1}, "definition_id": {"type": "string", "minLength": 1},
+    "surface_id": {"type": "string", "minLength": 1},
+    "ownership": {"enum": ["managed", "overlay-managed", "adopted", "create-once-then-user-owned", "user-owned"]},
+    "merge_strategy": {"enum": ["whole-file", "marked-block", "observe-baseline", "none"]},
+    "source_digest": {"$ref": "#/definitions/sha256"}, "render_digest": {"$ref": "#/definitions/sha256"},
+    "candidate_byte_hash": {"$ref": "#/definitions/sha256"}, "mode_policy": {"enum": ["exact", "preserve"]},
+    "candidate_mode": {"type": "string", "pattern": "^0[0-7]{3}$"},
+    "validator_results": {"type": "array", "items": {"type": "object"}}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

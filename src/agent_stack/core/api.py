@@ -44,7 +44,9 @@ from .surfaces import (
     validate_surface_registry,
 )
 from .task_policy import (
+    TaskSnapshotAndFindings,
     TaskGateResult,
+    VerifiedDiscoverySchemas,
     WorkspaceTaskState,
     evaluate_task_gate,
     evaluate_workspace_state_quiescence,
@@ -65,7 +67,9 @@ __all__ = [
     "SchemaCatalog",
     "SurfaceCoverageProof",
     "TaskGateResult",
+    "TaskSnapshotAndFindings",
     "VerifiedSurfaceRegistry",
+    "VerifiedDiscoverySchemas",
     "VerifiedTrellisTaskLayout",
     "WorkspaceDiagnostic",
     "WorkspaceTaskState",
