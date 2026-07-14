@@ -3,7 +3,7 @@
 - Approved plan: `docs/superpowers/plans/2026-07-14-production-composition-release-fix.md`
 - Branch: `fix/rc2-production-composition`
 - Worktree: `/mnt/c/Users/swl00/IFPRI Dropbox/Weilun Shi/Plan/.worktrees/agent-workflow-pack-rc2`
-- Release status: blocked; no RC4 or final tag is authorized.
+- Release status: release gate reached and awaiting review; no RC4 or final tag has been created.
 - Execution approval: subsequent implementation waves are pre-approved through the release gate; stop before tagging, pushing, or publishing.
 
 ## Completed
@@ -31,22 +31,21 @@
 - Production `upgrade` now verifies the initialized project against the running immutable release and returns an exact same-release no-op; a distinct target is immutable-release verified before the command stops at the saved-plan approval boundary.
 - A real built-and-installed wheel/sdist now passes the no-context-injection console chain `bootstrap → init --dry-run → init → doctor → test-routing → sync --dry-run → sync → sync` with HTTPS replaced only at the test transport boundary. It proves 17 owners, routing policy, user-file preservation, and strict repeated-sync no-op.
 - `doctor --write-probe` now creates a durable ignored-local probe transaction before target mutation; normal completion records exact evidence, while `recover --probe` cleans only recorded byte-identical residue and explicitly resumes or rolls back under project locks.
+- Final verification passed from the release-gate commit candidate: Ruff, `mypy src`, runtime vendor lock, generated notices, 686 pytest tests, rebuilt wheel/sdist inventory, production-integration prerequisite, and all 13 release gates.
+- Frozen candidate identities: artifact set `03d3b0e6ec4248835ae87931d19fc7761438df5985930636a0967d0fc42aaaf1`; wheel `dd45f2bc464d12ffd21ed85de88608d00a3cea13ed4427a4209de885a83c9107`; sdist `a79b17becbb7d7b926bba88d8e04db3a9f3ace885c40d572adfacfe430b17fd1`.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Focused release-authority and console verification: 9 tests passed; Ruff and mypy passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
 ## In Progress
 
-- Bind the remaining production command owners to reachable domain implementations.
+- None. Execution is stopped at the authorized release gate for review.
 
 ## Remaining
 
-- Protected launcher internal channel.
-- All 17 production owner bindings backed by reachable domain implementations.
-- Installed-wheel black-box acceptance and strict second-sync no-op.
-- Full Ruff, mypy, pytest, wheel/sdist, and production-integration evidence verification.
-- Publication is intentionally deferred until every item above passes.
+- Release review and explicit authorization for merge/tag/remote/publication actions.
+- Publication remains intentionally deferred.
 
 ## Resume
 
-Attach the installed-wheel evidence to the production-integration prerequisite, then run full Ruff, mypy, pytest, artifact rebuild, provenance/inventory checks, and the 13 release gates.
+Review the release-gate evidence. Do not run Task 8 publication actions without a new explicit instruction.
