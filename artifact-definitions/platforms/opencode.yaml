@@ -1,0 +1,22 @@
+schema_id: agent-workflow.artifact-definition
+schema_version: 1
+id: platform-opencode
+source: templates/platforms/opencode
+targets:
+  - path: .opencode/instructions/agent-workflow.md
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0644"
+  - path: .opencode/commands/agent-stack.md
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0644"
+  - path: .opencode/plugins/agent-workflow.js
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0644"
+forbidden_paths: []
+validators: [{id: utf8-text, version: 1}, {id: javascript-syntax, version: 1}]

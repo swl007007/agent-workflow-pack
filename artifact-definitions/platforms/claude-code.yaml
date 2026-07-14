@@ -1,0 +1,22 @@
+schema_id: agent-workflow.artifact-definition
+schema_version: 1
+id: platform-claude-code
+source: templates/platforms/claude-code
+targets:
+  - path: CLAUDE.md
+    ownership: overlay-managed
+    merge_strategy: marked-block
+    mode_policy: preserve
+    markers: {begin: "<!-- agent-workflow:claude:begin -->", end: "<!-- agent-workflow:claude:end -->"}
+  - path: .claude/commands/agent-stack.md
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0644"
+  - path: .claude/hooks/agent-workflow-gate.sh
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0755"
+forbidden_paths: []
+validators: [{id: utf8-text, version: 1}, {id: shell-syntax, version: 1}]

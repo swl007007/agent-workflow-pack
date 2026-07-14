@@ -1,0 +1,158 @@
+schema_id: agent-workflow.platform-catalog
+schema_version: 1
+platforms:
+  - harness_id: claude-code-cli
+    harness_version: 2.1.0
+    caller_platform_id: claude
+    version_probe_id: claude-code-version-v1
+    default_platform: true
+    probes: &claude_probes
+      direct_human_confirmation: claude-direct-confirmation-v1
+      explicit_runtime_load: claude-runtime-load-v1
+      maintenance_gate: claude-maintenance-gate-v1
+      native_light_binding: claude-native-light-v1
+      project_instructions: claude-project-instructions-v1
+      project_skills: claude-project-skills-v1
+      provider_exception_approval: claude-provider-approval-v1
+      route_gated_catalog: claude-route-catalog-v1
+      task_admission_gate: claude-task-admission-v1
+      task_archive_gate: claude-task-archive-v1
+    minimum_capabilities: &strict_minimums
+      direct_human_confirmation: enforced
+      explicit_runtime_load: enforced
+      maintenance_gate: enforced
+      native_light_binding: enforced
+      project_instructions: enforced
+      project_skills: enforced
+      provider_exception_approval: enforced
+      route_gated_catalog: enforced
+      task_admission_gate: enforced
+      task_archive_gate: enforced
+    adapter:
+      schema_id: agent-workflow.platform-adapter
+      schema_version: 1
+      platform: claude-code
+      adapter_id: claude-code
+      adapter_version: 1.0.0
+      tested_harness_versions: [2.1.0]
+      native_light_entry_id: claude-plan
+      caller_context_fields: [claude_home, harness.executable, tty.direct_confirmation_capable, user_home]
+      capability_probe_suite:
+        probe_suite_id: claude-code-capabilities-v1
+        probe_suite_version: 1
+        capability_ids: [direct_human_confirmation, explicit_runtime_load, maintenance_gate, native_light_binding, project_instructions, project_skills, provider_exception_approval, route_gated_catalog, task_admission_gate, task_archive_gate]
+      approval_verifiers:
+        task_creation:
+          verifier_id: claude-code-human-verifier
+          verifier_version: 1.0.0
+          actor_source: direct-human
+          receipt_source: claude-code-confirmation
+      render_projections:
+        - {unit_id: instruction:claude-project, target_path: CLAUDE.md, ownership: overlay-managed, merge_strategy: managed-block, mode: "0644", owning_surface_id: platform-adapter:claude-code, template_id: claude-project-v1, validator_ids: [utf8-text-v1], discoverable: true}
+        - {unit_id: command:claude-agent-stack, target_path: .claude/commands/agent-stack.md, ownership: pack-managed, merge_strategy: replace, mode: "0644", owning_surface_id: platform-adapter:claude-code, template_id: claude-command-v1, validator_ids: [utf8-text-v1], discoverable: true}
+        - {unit_id: hook:claude:runtime-gate, target_path: .claude/hooks/agent-workflow-gate.sh, ownership: pack-managed, merge_strategy: replace, mode: "0755", owning_surface_id: platform-adapter:claude-code, template_id: claude-hook-v1, validator_ids: [shell-v1], discoverable: false}
+      wrapper_entries: &common_wrappers
+        - {operation: execute-light, runtime_entry_id: claude-plan, allowed_modes: [native-light], allowed_phases: [], claim_policy: forbidden, command: [.agent-workflow/bin/agent-stack, route, execute-light]}
+        - {operation: integrated-runtime-load, runtime_entry_id: trellis-implement, allowed_modes: [trellis-native], allowed_phases: [], claim_policy: forbidden, command: [.agent-workflow/bin/agent-stack, task, runtime, load]}
+        - {operation: integrated-runtime-load, runtime_entry_id: heavy-development-router, allowed_modes: [speckit-superpowers], allowed_phases: [planning, implementing, verifying], claim_policy: required, command: [.agent-workflow/bin/agent-stack, task, runtime, load]}
+      blocked_bypass_entries: [/speckit.implement, /trellis.implement, direct-trellis-archive]
+      trellis_adapter_contract: &trellis_contract
+        active_root: .trellis/tasks
+        archive_root: .trellis/tasks/archive
+        integration_relative_path: integration.yaml
+        precommit_side_effects: disabled
+      golden_contract_id: claude-code-v1
+  - harness_id: codex-cli
+    harness_version: 0.100.0
+    caller_platform_id: codex
+    version_probe_id: codex-version-v1
+    default_platform: true
+    probes:
+      direct_human_confirmation: codex-direct-confirmation-v1
+      explicit_runtime_load: codex-runtime-load-v1
+      maintenance_gate: codex-maintenance-gate-v1
+      native_light_binding: codex-native-light-v1
+      project_instructions: codex-project-instructions-v1
+      project_skills: codex-project-skills-v1
+      provider_exception_approval: codex-provider-approval-v1
+      route_gated_catalog: codex-route-catalog-v1
+      task_admission_gate: codex-task-admission-v1
+      task_archive_gate: codex-task-archive-v1
+    minimum_capabilities: *strict_minimums
+    adapter:
+      schema_id: agent-workflow.platform-adapter
+      schema_version: 1
+      platform: codex
+      adapter_id: codex
+      adapter_version: 1.0.0
+      tested_harness_versions: [0.100.0]
+      native_light_entry_id: sol-native
+      caller_context_fields: [codex_home, harness.executable, tty.direct_confirmation_capable, user_home]
+      capability_probe_suite:
+        probe_suite_id: codex-capabilities-v1
+        probe_suite_version: 1
+        capability_ids: [direct_human_confirmation, explicit_runtime_load, maintenance_gate, native_light_binding, project_instructions, project_skills, provider_exception_approval, route_gated_catalog, task_admission_gate, task_archive_gate]
+      approval_verifiers:
+        task_creation:
+          verifier_id: codex-human-verifier
+          verifier_version: 1.0.0
+          actor_source: direct-human
+          receipt_source: codex-confirmation
+      render_projections:
+        - {unit_id: instruction:codex-agents, target_path: AGENTS.md, ownership: overlay-managed, merge_strategy: managed-block, mode: "0644", owning_surface_id: platform-adapter:codex, template_id: codex-agents-v1, validator_ids: [utf8-text-v1], discoverable: true}
+        - {unit_id: skill:codex-agent-workflow, target_path: .agents/skills/agent-workflow/SKILL.md, ownership: pack-managed, merge_strategy: replace, mode: "0644", owning_surface_id: platform-adapter:codex, template_id: codex-skill-v1, validator_ids: [utf8-text-v1], discoverable: true}
+        - {unit_id: command:codex-wrapper, target_path: .agent-workflow/bin/codex-wrapper, ownership: pack-managed, merge_strategy: replace, mode: "0755", owning_surface_id: platform-adapter:codex, template_id: codex-wrapper-v1, validator_ids: [shell-v1], discoverable: false}
+      wrapper_entries:
+        - {operation: execute-light, runtime_entry_id: sol-native, allowed_modes: [native-light], allowed_phases: [], claim_policy: forbidden, command: [.agent-workflow/bin/agent-stack, route, execute-light]}
+        - {operation: integrated-runtime-load, runtime_entry_id: trellis-implement, allowed_modes: [trellis-native], allowed_phases: [], claim_policy: forbidden, command: [.agent-workflow/bin/agent-stack, task, runtime, load]}
+        - {operation: integrated-runtime-load, runtime_entry_id: heavy-development-router, allowed_modes: [speckit-superpowers], allowed_phases: [planning, implementing, verifying], claim_policy: required, command: [.agent-workflow/bin/agent-stack, task, runtime, load]}
+      blocked_bypass_entries: [/speckit.implement, trellis-implement-direct, direct-trellis-archive]
+      trellis_adapter_contract: *trellis_contract
+      golden_contract_id: codex-v1
+  - harness_id: opencode-cli
+    harness_version: 1.0.0
+    caller_platform_id: opencode
+    version_probe_id: opencode-version-v1
+    default_platform: true
+    probes:
+      direct_human_confirmation: opencode-direct-confirmation-v1
+      explicit_runtime_load: opencode-runtime-load-v1
+      maintenance_gate: opencode-maintenance-gate-v1
+      native_light_binding: opencode-native-light-v1
+      project_instructions: opencode-project-instructions-v1
+      project_skills: opencode-project-skills-v1
+      provider_exception_approval: opencode-provider-approval-v1
+      route_gated_catalog: opencode-route-catalog-v1
+      task_admission_gate: opencode-task-admission-v1
+      task_archive_gate: opencode-task-archive-v1
+    minimum_capabilities: *strict_minimums
+    adapter:
+      schema_id: agent-workflow.platform-adapter
+      schema_version: 1
+      platform: opencode
+      adapter_id: opencode
+      adapter_version: 1.0.0
+      tested_harness_versions: [1.0.0]
+      native_light_entry_id: opencode-plan
+      caller_context_fields: [harness.executable, opencode_home, tty.direct_confirmation_capable, user_home]
+      capability_probe_suite:
+        probe_suite_id: opencode-capabilities-v1
+        probe_suite_version: 1
+        capability_ids: [direct_human_confirmation, explicit_runtime_load, maintenance_gate, native_light_binding, project_instructions, project_skills, provider_exception_approval, route_gated_catalog, task_admission_gate, task_archive_gate]
+      approval_verifiers:
+        task_creation:
+          verifier_id: opencode-human-verifier
+          verifier_version: 1.0.0
+          actor_source: direct-human
+          receipt_source: opencode-confirmation
+      render_projections:
+        - {unit_id: instruction:opencode-project, target_path: .opencode/instructions/agent-workflow.md, ownership: pack-managed, merge_strategy: replace, mode: "0644", owning_surface_id: platform-adapter:opencode, template_id: opencode-instructions-v1, validator_ids: [utf8-text-v1], discoverable: true}
+        - {unit_id: command:opencode-agent-stack, target_path: .opencode/commands/agent-stack.md, ownership: pack-managed, merge_strategy: replace, mode: "0644", owning_surface_id: platform-adapter:opencode, template_id: opencode-command-v1, validator_ids: [utf8-text-v1], discoverable: true}
+        - {unit_id: hook:opencode:runtime-gate, target_path: .opencode/plugins/agent-workflow.js, ownership: pack-managed, merge_strategy: replace, mode: "0644", owning_surface_id: platform-adapter:opencode, template_id: opencode-plugin-v1, validator_ids: [javascript-v1], discoverable: false}
+      wrapper_entries:
+        - {operation: execute-light, runtime_entry_id: opencode-plan, allowed_modes: [native-light], allowed_phases: [], claim_policy: forbidden, command: [.agent-workflow/bin/agent-stack, route, execute-light]}
+        - {operation: integrated-runtime-load, runtime_entry_id: trellis-implement, allowed_modes: [trellis-native], allowed_phases: [], claim_policy: forbidden, command: [.agent-workflow/bin/agent-stack, task, runtime, load]}
+        - {operation: integrated-runtime-load, runtime_entry_id: heavy-development-router, allowed_modes: [speckit-superpowers], allowed_phases: [planning, implementing, verifying], claim_policy: required, command: [.agent-workflow/bin/agent-stack, task, runtime, load]}
+      blocked_bypass_entries: [/speckit.implement, /trellis-implement, direct-trellis-archive]
+      trellis_adapter_contract: *trellis_contract
+      golden_contract_id: opencode-v1

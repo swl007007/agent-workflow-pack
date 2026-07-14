@@ -1,0 +1,22 @@
+schema_id: agent-workflow.artifact-definition
+schema_version: 1
+id: platform-codex
+source: templates/platforms/codex
+targets:
+  - path: AGENTS.md
+    ownership: overlay-managed
+    merge_strategy: marked-block
+    mode_policy: preserve
+    markers: {begin: "<!-- agent-workflow:codex:begin -->", end: "<!-- agent-workflow:codex:end -->"}
+  - path: .agents/skills/agent-workflow/SKILL.md
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0644"
+  - path: .agent-workflow/bin/codex-wrapper
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0755"
+forbidden_paths: []
+validators: [{id: utf8-text, version: 1}, {id: shell-syntax, version: 1}]
