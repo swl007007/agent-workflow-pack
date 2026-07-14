@@ -85,6 +85,18 @@ The interface registry and consumer imports are structured TSV blocks in this pl
 <!-- interface-registry:start -->
 ```tsv
 interface_id	definition_owner	implementation_owner	producer_content_commit	exported_interface_digest	state	imported_by	required_before_unlock
+core.schema-catalog.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-2,task-3,task-4,task-5,task-6	task-2
+core.profile-resolution.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-4,task-5,task-6	task-3
+core.artifact-policy.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-4,task-5	task-3
+core.surface-impact.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-4,task-5,task-6	task-3
+core.capability-manifest.v1	task-1	task-5	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-5,task-6	task-5
+core.route-contract.v1	task-1	task-5	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-4,task-5,task-6	task-4
+core.saved-plan.v1	task-1	task-3	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-4,task-6	task-3
+core.task-snapshot.v1	task-1	task-4	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-4,task-6	task-3
+core.task-evaluators.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-4,task-6	task-3
+core.workspace-diagnostics.v1	task-1	task-4	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-4,task-5,task-6	task-4
+core.render-projection.v1	task-1	task-3	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-3,task-5,task-6	task-3
+core.errors.v1	task-1	task-1	2e0bfda7619223397f7c9610d312a2aab42156ab	a6a850994705d115e82f0ff1660e1136581a991996b51fa7fa606963879b8c77	interface-frozen	task-2,task-3,task-4,task-5,task-6	task-2
 ```
 <!-- interface-registry:end -->
 
