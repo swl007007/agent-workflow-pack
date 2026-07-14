@@ -66,6 +66,22 @@ def test_ci_matrix_covers_python_311_through_314_and_artifact_gates() -> None:
     assert any("sync_runtime_vendor.py --check" in value for value in commands)
     assert complete_acceptance_command(commands)
 
+    steps = test_job["steps"]
+    assert isinstance(steps, list)
+    diagnostic_upload = next(
+        step
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("uses") == "actions/upload-artifact@v4"
+    )
+    assert diagnostic_upload.get("if") == "always()"
+    assert diagnostic_upload.get("with") == {
+        "name": "release-artifacts-python-${{ matrix.python-version }}",
+        "path": "dist/*.whl\ndist/*.tar.gz\ndist/release-artifact-set.json\n",
+        "if-no-files-found": "error",
+        "retention-days": 1,
+    }
+
 
 def test_release_workflow_orders_build_gate_manifest_publish_and_reverify() -> None:
     workflow = load_workflow("release.yml")
