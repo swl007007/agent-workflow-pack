@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.task-runtime-load-request",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "task_ref", "task_id", "expected_state_revision", "expected_lifecycle_status", "expected_phase", "expected_claim", "surface_id", "runtime_entry_id"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.task-runtime-load-request"},
+    "schema_version": {"const": 1},
+    "task_ref": {"type": "string", "minLength": 1},
+    "task_id": {"$ref": "#/$defs/uuid"},
+    "expected_state_revision": {"type": "integer", "minimum": 1},
+    "expected_lifecycle_status": {"enum": ["active", "blocked", "completed"]},
+    "expected_phase": {"type": ["string", "null"]},
+    "expected_claim": {"type": ["object", "null"]},
+    "surface_id": {"type": "string", "minLength": 1},
+    "runtime_entry_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$"}
+  },
+  "$defs": {
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}

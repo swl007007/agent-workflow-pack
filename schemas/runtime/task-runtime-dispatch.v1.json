@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.task-runtime-dispatch",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.task-runtime-dispatch.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "task_id", "task_ref", "state_revision", "mode", "lifecycle_status", "phase", "surface_id", "runtime_entry_id", "authorized_surface_ids", "unit_digests"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.task-runtime-dispatch"},
+    "schema_version": {"const": 1},
+    "task_id": {"$ref": "#/$defs/uuid"},
+    "task_ref": {"type": "string", "minLength": 1},
+    "state_revision": {"type": "integer", "minimum": 1},
+    "mode": {"enum": ["trellis-native", "speckit-superpowers"]},
+    "lifecycle_status": {"enum": ["active", "blocked", "completed"]},
+    "phase": {"type": ["string", "null"]},
+    "surface_id": {"type": "string", "minLength": 1},
+    "runtime_entry_id": {"type": "string", "minLength": 1},
+    "authorized_surface_ids": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+    "unit_digests": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/sha256"}
+    }
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}
