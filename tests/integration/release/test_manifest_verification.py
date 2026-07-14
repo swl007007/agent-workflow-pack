@@ -25,6 +25,7 @@ WHEEL_NAME = "agent_workflow_pack-0.1.0-py3-none-any.whl"
 SDIST_NAME = "agent_workflow_pack-0.1.0.tar.gz"
 BASE = "https://github.com/pinned-owner/agent-workflow-pack/releases/download/v0.1.0"
 MANIFEST_URL = f"{BASE}/release-manifest.json"
+MANIFEST_FINAL_URL = "https://release-assets.githubusercontent.com/frozen/release-manifest.json"
 WHEEL_URL = f"{BASE}/{WHEEL_NAME}"
 SDIST_URL = f"{BASE}/{SDIST_NAME}"
 
@@ -159,7 +160,7 @@ def _install_fetcher(
                 commit_url, json.dumps({"sha": tag_commit}, indent=2).encode("utf-8")
             )
         if url == MANIFEST_URL:
-            return FetchedContent(MANIFEST_URL, manifest_bytes)
+            return FetchedContent(MANIFEST_FINAL_URL, manifest_bytes)
         raise AssertionError(f"unexpected fetch URL: {url}")
 
     monkeypatch.setattr(trust, "fetch_https", fetch)

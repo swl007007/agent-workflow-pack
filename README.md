@@ -13,11 +13,11 @@ verification, and review; its planner and executor are not automatically exposed
 
 ## Release status
 
-Version `0.1.2` is released only from the immutable GitHub release at
+Version `0.1.3` is released only from the immutable GitHub release at
 `swl007007/agent-workflow-pack`. Do not install from an untagged branch, a mutable asset,
 or a locally supplied manifest.
 
-Versions `0.1.0` and `0.1.1` are retained as failed publications and must not be
+Versions `0.1.0` through `0.1.2` are retained as failed publications and must not be
 installed.
 
 The canonical first-install command is published with the release and binds:
@@ -43,7 +43,7 @@ The runtime wheel is self-contained and has no runtime `Requires-Dist` dependenc
 
 ## Quick start
 
-Run the canonical bootstrap command from the `v0.1.2` release, then enter the target
+Run the canonical bootstrap command from the `v0.1.3` release, then enter the target
 project and execute:
 
 ```bash

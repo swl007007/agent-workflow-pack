@@ -29,7 +29,11 @@ def policy_document() -> dict[str, object]:
         "tag_template": "v{version}",
         "manifest_asset_name": "release-manifest.json",
         "api_base_url": "https://api.github.com",
-        "allowed_redirect_hosts": ["github.com", "objects.githubusercontent.com"],
+        "allowed_redirect_hosts": [
+            "github.com",
+            "objects.githubusercontent.com",
+            "release-assets.githubusercontent.com",
+        ],
         "immutable_release_required": True,
     }
     return {
@@ -65,6 +69,11 @@ def test_checked_in_trust_policy_uses_the_real_release_repository() -> None:
     policy = PackagedTrustPolicy.from_document(document)
     assert policy.owner == "swl007007"
     assert policy.repository == "agent-workflow-pack"
+    assert policy.allowed_redirect_hosts == (
+        "github.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+    )
 
 
 def test_locator_has_no_repository_url_hash_or_trust_override_fields() -> None:
