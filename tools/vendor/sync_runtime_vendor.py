@@ -337,6 +337,8 @@ def _validate_installed_tree(root: Path, components: dict[str, dict[str, Any]]) 
         actual: set[str] = set()
         for path in target_root.rglob("*"):
             relative = path.relative_to(root).as_posix()
+            if "__pycache__" in path.parts or path.suffix == ".pyc":
+                continue
             if path.is_symlink():
                 raise VendorError(f"vendor tree contains symlink: {relative}")
             if path.is_file():

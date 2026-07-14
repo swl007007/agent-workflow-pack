@@ -74,7 +74,7 @@ def test_publication_sequence_uses_final_bytes_once_then_re_fetches_every_asset(
     result = publish_immutable_release(
         artifact_set_path=ROOT / "dist/release-artifact-set.json",
         version="0.1.0",
-        source_commit="a" * 40,
+        source_commit="276b74ba2c4f7347a9cf01a4c76eea972e90906e",
         client=client,
     )
 
@@ -102,7 +102,7 @@ def test_publication_fails_if_final_artifact_changes_after_release_creation() ->
             publish_immutable_release(
                 artifact_set_path=ROOT / "dist/release-artifact-set.json",
                 version="0.1.0",
-                source_commit="b" * 40,
+                source_commit="276b74ba2c4f7347a9cf01a4c76eea972e90906e",
                 client=client,
             )
     finally:

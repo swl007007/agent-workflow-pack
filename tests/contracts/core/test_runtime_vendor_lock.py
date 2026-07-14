@@ -146,7 +146,7 @@ def test_every_locked_file_and_full_license_matches_the_installed_bytes() -> Non
         path.relative_to(ROOT).as_posix()
         for component in lock["components"]
         for path in (ROOT / component["install"]["target_root"]).rglob("*")
-        if path.is_file()
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
     }
     assert actual_inventory == installed_inventory
 
