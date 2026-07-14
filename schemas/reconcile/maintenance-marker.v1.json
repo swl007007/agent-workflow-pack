@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.maintenance-marker",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-3",
+  "x-implementation-owner": "task-3",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "transaction_id", "journal_binding_digest", "plan_digest", "task_quiescence_digest", "candidate_manifest_generation"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.maintenance-marker"},
+    "schema_version": {"const": 1},
+    "transaction_id": {"type": "string"},
+    "journal_binding_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "plan_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "task_quiescence_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "candidate_manifest_generation": {"type": "integer", "minimum": 1}
+  }
+}

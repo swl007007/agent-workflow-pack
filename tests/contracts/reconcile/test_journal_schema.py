@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from agent_stack.core.api import SchemaCatalog, digest
+from agent_stack.core.api import SchemaCatalog, compute_journal_binding_digest
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -28,9 +28,7 @@ def _journal(phase: str = "planned") -> dict[str, object]:
         "schema_id": "agent-workflow.lifecycle-transaction",
         "schema_version": 1,
         "immutable_header": immutable_header,
-        "journal_binding_digest": digest(
-            "agent-workflow.lifecycle-transaction.v1", immutable_header
-        ),
+        "journal_binding_digest": compute_journal_binding_digest(immutable_header),
         "task_quiescence_snapshot": {},
         "plan_digest": "f" * 64,
         "candidate_manifest_digest": "1" * 64,

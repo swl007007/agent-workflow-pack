@@ -7,7 +7,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
 
-from agent_stack.core.api import CANONICAL_NULL, digest, normalize_mode, normalize_path
+from agent_stack.core.api import (
+    CANONICAL_NULL,
+    compute_journal_binding_digest,
+    normalize_mode,
+    normalize_path,
+)
 
 from .errors import RendererFailure
 
@@ -232,7 +237,7 @@ class LifecycleJournal:
             raise _failure("lifecycle journal fields are not closed")
         header = _mapping(document.get("immutable_header"), "immutable_header")
         claimed = _sha256(document.get("journal_binding_digest"), "journal_binding_digest")
-        actual = digest("agent-workflow.lifecycle-transaction.v1", header)
+        actual = compute_journal_binding_digest(header)
         if claimed != actual:
             raise _failure("lifecycle journal immutable binding changed")
         phase = document.get("phase")
