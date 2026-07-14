@@ -45,7 +45,7 @@ constraints:
 ```
 
 It selects one exact wheel URL with a SHA-256 fragment. Copy that complete command from
-the immutable `v0.1.3` release. The `v0.1.0` through `v0.1.2` publications are failed
+the immutable `v0.1.4` release. The `v0.1.0` through `v0.1.3` publications are failed
 evidence and must not be used.
 
 ## 3. First installation
@@ -271,7 +271,7 @@ Release only from a clean commit whose final tag points exactly to `HEAD`:
 ```bash
 git status --porcelain
 git rev-parse HEAD
-git rev-list -n 1 v0.1.3
+git rev-list -n 1 v0.1.4
 ```
 
 Required sequence:
@@ -289,8 +289,8 @@ Required sequence:
    sequence in Section 4.
 
 Never rebuild after freezing and then reuse old hashes. Never move a published tag or
-replace published assets. `v0.1.0` through `v0.1.2` are already recorded as failed; any
-failure after the `v0.1.3` publication must use a new Release Identity.
+replace published assets. `v0.1.0` through `v0.1.3` are already recorded as failed; any
+failure after the `v0.1.4` publication must use a new Release Identity.
 
 ## 14. Evidence to retain
 

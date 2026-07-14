@@ -1,9 +1,9 @@
 # Production Integration Progress
 
 - Approved plan: `docs/superpowers/plans/2026-07-14-production-composition-release-fix.md`
-- Branch: `fix/v0.1.3-release-assets-host`
+- Branch: `fix/v0.1.4-reproducible-ci`
 - Worktree: `/mnt/c/Users/swl00/IFPRI Dropbox/Weilun Shi/Plan/agent-workflow-pack`
-- Release status: `v0.1.0` through `v0.1.2` are preserved as failed publications; repository immutability is enabled and the `v0.1.3` corrective release is being prepared.
+- Release status: `v0.1.0` through `v0.1.3` are preserved as failed publications; `v0.1.4` is being prepared after CI exposed non-reproducible container timestamps.
 - Execution approval: continue through immutable publication and post-release acceptance.
 
 ## Completed
@@ -39,13 +39,13 @@
 
 ## In Progress
 
-- Freeze, tag, publish, and post-release dogfood the corrective `v0.1.3` Release Identity.
+- Make cross-Python CI reproduce one artifact set, then freeze and dogfood `v0.1.4`.
 
 ## Remaining
 
-- Commit the exact current GitHub release-asset redirect authority.
-- Fast-forward `main`, create and push `v0.1.3`, publish exact frozen assets, re-fetch hashes, and run canonical installed-console dogfood.
+- Commit the frozen `SOURCE_DATE_EPOCH` build input and obtain a green CI matrix.
+- Only after CI passes, create and publish `v0.1.4` and resume canonical dogfood.
 
 ## Resume
 
-Resume from the `v0.1.3` freeze commit; never move or replace earlier tags or assets.
+Resume from the reproducible-build CI fix; never move or replace earlier tags or assets.

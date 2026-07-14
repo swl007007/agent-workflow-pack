@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 import tarfile
@@ -232,6 +233,12 @@ def _select_artifacts(output_dir: Path) -> tuple[Path, Path]:
     return wheels[0], sdists[0]
 
 
+def _source_date_epoch() -> str:
+    """Return the frozen earliest ZIP epoch for reproducible container bytes."""
+
+    return "315532800"
+
+
 def _assemble(root: Path, wheel_path: Path, sdist_path: Path) -> ReleaseArtifactSet:
     provenance = load_frozen_provenance(root)
     git_inventory = _git_inventory(root)
@@ -284,10 +291,13 @@ def build_release_artifacts(
         uv = shutil.which("uv")
         if uv is None:
             raise _failure("uv is required to build release artifacts")
+        environment = os.environ.copy()
+        environment["SOURCE_DATE_EPOCH"] = _source_date_epoch()
         subprocess.run(
             [uv, "build", "--out-dir", str(output_dir)],
             cwd=root,
             check=True,
+            env=environment,
         )
     wheel_path, sdist_path = _select_artifacts(output_dir)
     artifact_set = _assemble(root, wheel_path, sdist_path)
