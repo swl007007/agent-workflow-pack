@@ -757,3 +757,68 @@ def test_production_workspace_migrate_uses_exact_target_owned_edge(
     assert migrated["local_state_contract_digest"] == manifest["local_state_contract"][
         "contract_digest"
     ]
+
+
+def test_production_recover_resumes_workspace_registration_journal(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import agent_stack.runtime.workspace as workspace_module
+
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+    shutil.rmtree(project / ".agent-workflow/local")
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = replace(
+        release,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+
+    def crash(point: str) -> None:
+        if point == "after_workspace":
+            raise RuntimeError("registration crash")
+
+    monkeypatch.setattr(workspace_module, "_crash_at", crash)
+    with pytest.raises(RuntimeError, match="registration crash"):
+        runtime_commands.run_workspace_register(
+            _launcher_command(project, tmp_path / "caller-register-crash")
+        )
+    monkeypatch.setattr(workspace_module, "_crash_at", lambda point: None)
+    journal = next(
+        (project / ".agent-workflow/local/workspace-transactions").glob("*.json")
+    )
+    monkeypatch.setattr(commands, "_authorize_running_release", lambda: registered_release)
+
+    result = commands.run_recover(
+        _launcher_command(
+            project,
+            tmp_path / "caller-register-recover",
+            command="recover",
+            options=MappingProxyType(
+                {
+                    "journal_kind": "workspace-registration",
+                    "journal_id": journal.stem,
+                    "recovery_action": "resume",
+                }
+            ),
+        )
+    )
+
+    assert result["committed"] is True
+    assert (project / ".agent-workflow/local/approval-replay.json").is_file()

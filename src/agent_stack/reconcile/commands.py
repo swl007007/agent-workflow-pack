@@ -82,7 +82,34 @@ def run_sync(payload: object) -> Mapping[str, object]:
 
 
 def run_recover(payload: object) -> object:
+    from agent_stack.runtime.commands import _verified_project
+    from agent_stack.runtime.workspace import recover_workspace_registration
+
+    command = cast(ProductionCommand, payload)
+    kind = command.invocation.options.get("journal_kind")
+    transaction_id = command.invocation.options.get("journal_id")
+    action = command.invocation.options.get("recovery_action")
+    if not isinstance(transaction_id, str) or action not in {"resume", "rollback"}:
+        raise RendererFailure(
+            "AWP_RECONCILE_RECOVERY_REQUIRED", "recovery selection is invalid"
+        )
+    _verified_project(command)
+    if kind == "workspace-registration":
+        result = recover_workspace_registration(
+            command.repository_root,
+            transaction_id,
+            action=action,
+            bootstrap_lock_root=command.repository_root.parent / ".awp-bootstrap-locks",
+        )
+        return MappingProxyType(
+            {
+                "schema_id": "agent-workflow.recovery-result",
+                "schema_version": 1,
+                "journal_kind": kind,
+                "transaction_id": transaction_id,
+                "committed": result.committed,
+            }
+        )
     raise RendererFailure(
-        "AWP_RECONCILE_RECOVERY_REQUIRED",
-        "recovery requires a verified production journal binding",
+        "AWP_RECONCILE_RECOVERY_REQUIRED", "recovery journal kind is not yet bound"
     )
