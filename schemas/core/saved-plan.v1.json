@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.saved-plan",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-3",
+  "x-digest-domains": ["agent-workflow.plan-core.v1", "agent-workflow.journal-binding.v1", "agent-workflow.saved-plan.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "operation", "plan_core", "plan_core_digest", "immutable_header", "journal_binding_digest", "candidate_manifest_digest", "candidate_manifest_file_state", "plan_digest"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.saved-plan"},
+    "schema_version": {"const": 1},
+    "operation": {"enum": ["init", "sync", "repair", "upgrade"]},
+    "plan_core": {"$ref": "#/definitions/planCore"},
+    "plan_core_digest": {"$ref": "#/definitions/sha256"},
+    "immutable_header": {"$ref": "#/definitions/immutableHeader"},
+    "journal_binding_digest": {"$ref": "#/definitions/sha256"},
+    "candidate_manifest_digest": {"$ref": "#/definitions/sha256"},
+    "candidate_manifest_file_state": {"$ref": "#/definitions/manifestFileState"},
+    "plan_digest": {"$ref": "#/definitions/sha256"}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"},
+    "release": {
+      "type": "object", "additionalProperties": false,
+      "required": ["release_id", "release_manifest_digest"],
+      "properties": {"release_id": {"$ref": "#/definitions/sha256"}, "release_manifest_digest": {"$ref": "#/definitions/sha256"}}
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["release_id", "release_manifest_digest", "runtime_role"],
+      "properties": {"release_id": {"$ref": "#/definitions/sha256"}, "release_manifest_digest": {"$ref": "#/definitions/sha256"}, "runtime_role": {"enum": ["committed", "candidate"]}}
+    },
+    "planCore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation", "transaction_id", "candidate_release", "release_trust_policy_id",
+        "release_trust_policy_digest", "profile_digest", "lock_digest",
+        "artifact_bundle_digest", "pack_version", "source_trellis_task_layout_digest",
+        "target_trellis_task_layout_digest", "source_schema_bundle_digest",
+        "target_schema_bundle_digest", "task_quiescence_snapshot", "task_findings",
+        "task_quiescence_digest", "candidate_impact", "workspace_state_evaluation",
+        "task_gate_evaluation", "preconditions", "candidate_file_states",
+        "candidate_local_state_contract", "provider_approval_bindings", "recovery_runtime",
+        "candidate_manifest_generation"
+      ],
+      "properties": {
+        "operation": {"enum": ["init", "sync", "repair", "upgrade"]},
+        "transaction_id": {"$ref": "#/definitions/uuid"},
+        "candidate_release": {"$ref": "#/definitions/release"},
+        "release_trust_policy_id": {"type": "string", "minLength": 1},
+        "release_trust_policy_digest": {"$ref": "#/definitions/sha256"},
+        "profile_digest": {"$ref": "#/definitions/sha256"},
+        "lock_digest": {"$ref": "#/definitions/sha256"},
+        "artifact_bundle_digest": {"$ref": "#/definitions/sha256"},
+        "pack_version": {"type": "string", "minLength": 1},
+        "source_trellis_task_layout_digest": {"$ref": "#/definitions/sha256"},
+        "target_trellis_task_layout_digest": {"$ref": "#/definitions/sha256"},
+        "source_schema_bundle_digest": {"$ref": "#/definitions/sha256"},
+        "target_schema_bundle_digest": {"$ref": "#/definitions/sha256"},
+        "task_quiescence_snapshot": {"type": "object"},
+        "task_findings": {"type": "object"},
+        "task_quiescence_digest": {"$ref": "#/definitions/sha256"},
+        "candidate_impact": {"type": "object"},
+        "workspace_state_evaluation": {"type": "object"},
+        "task_gate_evaluation": {"type": "object"},
+        "preconditions": {"type": "array"},
+        "candidate_file_states": {"type": "array"},
+        "candidate_local_state_contract": {"type": "object"},
+        "provider_approval_bindings": {"type": "array"},
+        "recovery_runtime": {"$ref": "#/definitions/runtime"},
+        "candidate_manifest_generation": {"type": "integer", "minimum": 0},
+        "project_id_precondition": {"const": "absent"},
+        "candidate_project_id": {"$ref": "#/definitions/uuid"},
+        "workspace_instance_precondition": {"const": "absent"},
+        "candidate_workspace_instance_id": {"$ref": "#/definitions/uuid"},
+        "manifest_precondition": {"const": "absent"},
+        "approval_replay_precondition": {"const": "absent"},
+        "empty_replay_ledger_candidate_digest": {"$ref": "#/definitions/sha256"},
+        "target_path_digest": {"$ref": "#/definitions/sha256"},
+        "project_id": {"$ref": "#/definitions/uuid"},
+        "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+        "manifest_generation": {"type": "integer", "minimum": 0},
+        "manifest_digest": {"$ref": "#/definitions/sha256"},
+        "installed_release": {"$ref": "#/definitions/release"},
+        "repair_surface_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "compatibility_identity": {"$ref": "#/definitions/sha256"}
+      },
+      "oneOf": [
+        {"properties": {"operation": {"const": "init"}}, "required": ["project_id_precondition", "candidate_project_id", "workspace_instance_precondition", "candidate_workspace_instance_id", "manifest_precondition", "approval_replay_precondition", "empty_replay_ledger_candidate_digest", "target_path_digest"]},
+        {"properties": {"operation": {"const": "sync"}}, "required": ["project_id", "workspace_instance_id", "manifest_generation", "manifest_digest", "installed_release"]},
+        {"properties": {"operation": {"const": "repair"}}, "required": ["project_id", "workspace_instance_id", "manifest_generation", "manifest_digest", "installed_release", "repair_surface_ids"]},
+        {"properties": {"operation": {"const": "upgrade"}}, "required": ["project_id", "workspace_instance_id", "manifest_generation", "manifest_digest", "installed_release", "compatibility_identity"]}
+      ]
+    },
+    "immutableHeader": {
+      "type": "object", "additionalProperties": false,
+      "required": ["transaction_id", "operation", "plan_core_digest", "baseline_manifest_digest", "candidate_manifest_generation", "task_quiescence_digest", "recovery_runtime"],
+      "properties": {
+        "transaction_id": {"$ref": "#/definitions/uuid"},
+        "operation": {"enum": ["init", "sync", "repair", "upgrade"]},
+        "project_id": {"$ref": "#/definitions/uuid"},
+        "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+        "candidate_project_id": {"$ref": "#/definitions/uuid"},
+        "candidate_workspace_instance_id": {"$ref": "#/definitions/uuid"},
+        "plan_core_digest": {"$ref": "#/definitions/sha256"},
+        "baseline_manifest_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "absent"}]},
+        "candidate_manifest_generation": {"type": "integer", "minimum": 0},
+        "task_quiescence_digest": {"$ref": "#/definitions/sha256"},
+        "recovery_runtime": {"$ref": "#/definitions/runtime"}
+      }
+    },
+    "manifestFileState": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "byte_hash", "mode", "file_type", "non_symlink"],
+      "properties": {"path": {"const": ".agent-workflow/manifest.json"}, "byte_hash": {"$ref": "#/definitions/sha256"}, "mode": {"const": "0644"}, "file_type": {"const": "regular"}, "non_symlink": {"const": true}}
+    }
+  }
+}

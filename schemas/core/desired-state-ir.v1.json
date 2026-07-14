@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.desired-state-ir",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": ["agent-workflow.desired-state-ir.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id", "schema_version", "operation", "release_contract", "resolved_profile",
+    "authority_digests", "workflow_lock_projection", "selected_platforms",
+    "capability_results", "catalog_closure", "reference_closure", "route_policy",
+    "entry_ownership", "discoverable_leaf_ids", "runtime_catalog_entry_ids",
+    "trellis_task_layout", "surface_registry", "surface_digests", "coverage_result",
+    "render_units", "artifact_definitions", "candidate_impact",
+    "workspace_state_evaluation", "task_gate_evaluation", "diagnostics",
+    "desired_state_ir_digest"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.desired-state-ir"},
+    "schema_version": {"const": 1},
+    "operation": {"enum": ["init", "sync", "repair", "upgrade"]},
+    "release_contract": {"type": "object"},
+    "resolved_profile": {"type": "object"},
+    "authority_digests": {"type": "object", "additionalProperties": {"$ref": "#/definitions/sha256"}},
+    "workflow_lock_projection": {"type": "object"},
+    "selected_platforms": {"type": "array", "items": {"type": "string"}},
+    "capability_results": {"type": "array", "items": {"type": "object"}},
+    "catalog_closure": {"type": "array", "items": {"type": "string"}},
+    "reference_closure": {"type": "array", "items": {"type": "string"}},
+    "route_policy": {"type": "object"},
+    "entry_ownership": {"type": "array", "items": {"type": "object"}},
+    "discoverable_leaf_ids": {"type": "array", "items": {"type": "string"}},
+    "runtime_catalog_entry_ids": {"type": "array", "items": {"type": "string"}},
+    "trellis_task_layout": {"type": "object"},
+    "surface_registry": {"type": "object"},
+    "surface_digests": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["surface_id", "surface_digest"],
+        "properties": {"surface_id": {"type": "string"}, "surface_digest": {"$ref": "#/definitions/sha256"}}
+      }
+    },
+    "coverage_result": {"type": "object"},
+    "render_units": {"type": "array", "items": {"type": "object"}},
+    "artifact_definitions": {"type": "array", "items": {"type": "object"}},
+    "candidate_impact": {"type": "object"},
+    "workspace_state_evaluation": {"type": "object"},
+    "task_gate_evaluation": {"type": "object"},
+    "diagnostics": {"type": "array", "items": {"type": "object"}},
+    "desired_state_ir_digest": {"$ref": "#/definitions/sha256"}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}
