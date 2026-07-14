@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import gzip
+import io
 import json
 import os
 import shutil
@@ -239,6 +241,62 @@ def _source_date_epoch() -> str:
     return "315532800"
 
 
+def _normalize_distribution_archives(wheel_path: Path, sdist_path: Path) -> None:
+    wheel_records: list[tuple[str, bytes, bool]] = []
+    with zipfile.ZipFile(wheel_path) as archive:
+        for zip_info in archive.infolist():
+            executable = bool((zip_info.external_attr >> 16) & 0o111)
+            wheel_records.append(
+                (zip_info.filename, archive.read(zip_info), executable)
+            )
+    wheel_candidate = wheel_path.with_suffix(wheel_path.suffix + ".normalized")
+    with zipfile.ZipFile(wheel_candidate, "w", compression=zipfile.ZIP_STORED) as archive:
+        for name, wheel_body, executable in sorted(wheel_records):
+            normalized_zip = zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0))
+            normalized_zip.create_system = 3
+            normalized_zip.compress_type = zipfile.ZIP_STORED
+            normalized_zip.external_attr = (
+                ((0o755 if executable else 0o644) & 0xFFFF) << 16
+            )
+            archive.writestr(normalized_zip, wheel_body)
+    wheel_candidate.replace(wheel_path)
+
+    tar_records: list[tuple[tarfile.TarInfo, bytes | None]] = []
+    with tarfile.open(sdist_path, "r:gz") as archive:
+        for original in archive.getmembers():
+            member_body: bytes | None = None
+            if original.isfile():
+                stream = archive.extractfile(original)
+                if stream is None:
+                    raise _failure("sdist member body is unavailable", path=original.name)
+                member_body = stream.read()
+            tar_records.append((original, member_body))
+    sdist_candidate = sdist_path.with_suffix(sdist_path.suffix + ".normalized")
+    with sdist_candidate.open("wb") as raw:
+        with gzip.GzipFile(fileobj=raw, mode="wb", filename="", mtime=0, compresslevel=0) as gz:
+            with tarfile.open(fileobj=gz, mode="w", format=tarfile.PAX_FORMAT) as archive:
+                for original, member_body in sorted(
+                    tar_records, key=lambda item: item[0].name
+                ):
+                    normalized_tar = tarfile.TarInfo(original.name)
+                    normalized_tar.type = original.type
+                    normalized_tar.linkname = original.linkname
+                    normalized_tar.mode = original.mode
+                    normalized_tar.uid = 0
+                    normalized_tar.gid = 0
+                    normalized_tar.uname = ""
+                    normalized_tar.gname = ""
+                    normalized_tar.mtime = int(_source_date_epoch())
+                    normalized_tar.size = (
+                        len(member_body) if member_body is not None else 0
+                    )
+                    archive.addfile(
+                        normalized_tar,
+                        None if member_body is None else io.BytesIO(member_body),
+                    )
+    sdist_candidate.replace(sdist_path)
+
+
 def _assemble(root: Path, wheel_path: Path, sdist_path: Path) -> ReleaseArtifactSet:
     provenance = load_frozen_provenance(root)
     git_inventory = _git_inventory(root)
@@ -299,6 +357,8 @@ def build_release_artifacts(
             check=True,
             env=environment,
         )
+        wheel_path, sdist_path = _select_artifacts(output_dir)
+        _normalize_distribution_archives(wheel_path, sdist_path)
     wheel_path, sdist_path = _select_artifacts(output_dir)
     artifact_set = _assemble(root, wheel_path, sdist_path)
     artifact_path = output_dir / "release-artifact-set.json"
