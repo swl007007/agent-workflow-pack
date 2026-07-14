@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.ownership-decision",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-3",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "path", "definition_id", "ownership", "observed_file_state", "baseline_file_state", "candidate_file_state", "action", "reason_code"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.ownership-decision"},
+    "schema_version": {"const": 1},
+    "path": {"type": "string", "minLength": 1},
+    "definition_id": {"type": "string", "minLength": 1},
+    "ownership": {"enum": ["managed", "overlay-managed", "adopted", "create-once-then-user-owned", "user-owned"]},
+    "observed_file_state": {"type": "object"},
+    "baseline_file_state": {"type": "object"},
+    "candidate_file_state": {"type": "object"},
+    "action": {"enum": ["no-op", "create", "replace", "update-managed-block", "adopt-baseline", "restorative-repair", "block"]},
+    "reason_code": {"type": "string", "minLength": 1}
+  }
+}

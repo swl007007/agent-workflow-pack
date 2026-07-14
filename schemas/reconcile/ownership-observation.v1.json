@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.ownership-observation",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-3",
+  "x-implementation-owner": "task-3",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "path", "file_state", "marker_state", "managed_block_hash"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.ownership-observation"},
+    "schema_version": {"const": 1},
+    "path": {"type": "string", "minLength": 1},
+    "file_state": {"type": "object"},
+    "marker_state": {"enum": ["not-applicable", "unique", "missing", "duplicate", "malformed"]},
+    "managed_block_hash": {"oneOf": [{"type": "string", "pattern": "^[0-9a-f]{64}$"}, {"const": "canonical-null"}]}
+  }
+}

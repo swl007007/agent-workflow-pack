@@ -5,24 +5,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Final
 
-from agent_stack.core.api import DesiredStateIR, SavedPlanEnvelope, TaskSnapshotAndFindings
+from agent_stack.core.api import SavedPlanEnvelope
 from .models import FileState, LifecycleJournal, StagedFile, StagedRenderTree
+from .plan import plan_reconcile
 from .ports import TaskQuiescenceScannerPort
 from .render import render
 
 
 RECONCILE_INTERFACE_VERSION: Final = 1
 PUBLIC_MODELS: Final = (FileState, LifecycleJournal, StagedFile, StagedRenderTree)
-
-
-def plan_reconcile(
-    ir: DesiredStateIR,
-    staged: StagedRenderTree,
-    manifest: Mapping[str, object] | None,
-    observed: Mapping[str, object],
-    task_snapshot: TaskSnapshotAndFindings,
-) -> SavedPlanEnvelope:
-    raise NotImplementedError("reconcile planning is not implemented yet")
 
 
 def apply_plan(
