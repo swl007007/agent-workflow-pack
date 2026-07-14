@@ -6,10 +6,18 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from types import MappingProxyType
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from .parser import CommandInvocation
 from .redaction import sanitize_document
+
+if TYPE_CHECKING:
+    from agent_stack.release.distribution import (
+        UpgradePorts,
+        UpgradeRecoveryPorts,
+        UpgradeRecoveryRequest,
+        UpgradeRequest,
+    )
 
 
 OWNER_MATRIX: Final = MappingProxyType(
@@ -184,3 +192,21 @@ def compose_lifecycle_command(
         repository_root=runtime_context.repository_root,
         workspace_diagnostic=runtime_context.workspace_diagnostic,
     )
+
+
+def bind_upgrade_command(request: UpgradeRequest, ports: UpgradePorts) -> OwnerBinding:
+    """Bind Task 5's lifecycle orchestrator without changing its domain results."""
+
+    from agent_stack.release.distribution import orchestrate_upgrade
+
+    return OwnerBinding(owner="lifecycle", invoke=lambda _: orchestrate_upgrade(request, ports))
+
+
+def bind_upgrade_recovery_command(
+    request: UpgradeRecoveryRequest, ports: UpgradeRecoveryPorts
+) -> OwnerBinding:
+    """Bind exact lifecycle recovery selected by the journal runtime allowlist."""
+
+    from agent_stack.release.distribution import recover_upgrade
+
+    return OwnerBinding(owner="reconcile", invoke=lambda _: recover_upgrade(request, ports))
