@@ -6,15 +6,17 @@
 
 **Goal:** Build the schema, canonicalization, profile/catalog Resolver, protected-path policy, runtime-surface coverage, candidate-impact, pure task evaluators, saved-plan digest primitives, diagnostics, and frozen Task 1 API.
 
-**Architecture:** A dependency-free public core package uses closed dataclasses and pure functions. Repository YAML/JSON is parsed into normalized values, validated against versioned schemas, and converted into immutable domain models before any digest or policy calculation. Downstream features import only src/agent_stack/core/api.py.
+**Architecture:** A public core package with no external runtime dependencies uses closed dataclasses and pure functions. Repository YAML/JSON is parsed through one hash-locked private vendor namespace, validated against versioned schemas, and converted into immutable domain models before any digest or policy calculation. Downstream features import only src/agent_stack/core/api.py; vendored modules are never a public API.
 
-**Tech Stack:** Python 3.11-3.14, stdlib dataclasses/enum/hashlib/json/pathlib/uuid, a vendored pure-Python YAML/JSON-schema layer selected during Task 1, pytest, Hypothesis, Ruff, mypy, uv.
+**Tech Stack:** Python 3.11-3.14, stdlib dataclasses/enum/hashlib/json/pathlib/uuid, privately vendored PyYAML 6.0.2 and fastjsonschema 2.21.1 from the exact sdists below, pytest, Hypothesis, Ruff, mypy, uv.
 
 ## Global Constraints
 
 - Source of truth: approved core spec at docs/superpowers/specs/2026-07-13-agent-workflow-pack-core-resolver-design.md, producer C 2e0bfda7619223397f7c9610d312a2aab42156ab.
 - Umbrella content digest must remain c2f23807cc36066b4b92478657cacaf15eb5cb6bd14e307e1e76f1c30de0284d.
 - Runtime package must remain self-contained; pyproject runtime dependencies stay empty.
+- The v0.1 runtime vendor set is frozen before schema implementation. No implementation task may select, upgrade, or add a helper outside `vendor/runtime-vendor-lock.json`.
+- Every vendored file, source archive, full license, namespace relocation, and modification flag is locked and reproducibly verified.
 - Supported Python is >=3.11,<3.15.
 - Schema ID, schema version, and digest domain are separate exact identifiers.
 - RFC 8785 JCS, NFC/path/mode normalization, duplicate-key rejection, and domain-separated SHA-256 are normative.
@@ -39,6 +41,10 @@ Create:
 ~~~text
 pyproject.toml
 src/agent_stack/__init__.py
+src/agent_stack/_vendor/
+  __init__.py
+  yaml/
+  fastjsonschema/
 src/agent_stack/core/
   __init__.py
   api.py
@@ -56,6 +62,10 @@ src/agent_stack/core/
   errors.py
   resolver.py
 schemas/core/
+vendor/runtime-vendor-lock.json
+vendor/licenses/PyYAML-6.0.2.txt
+vendor/licenses/fastjsonschema-2.21.1.txt
+tools/vendor/sync_runtime_vendor.py
 tests/conftest.py
 tests/unit/core/
 tests/contracts/core/
@@ -64,6 +74,15 @@ tests/property/core/
 
 api.py is the only downstream import surface. schema_catalog.py loads versioned schemas and rejects duplicate keys/unknown versions. canonical.py owns normalization and digest helpers. Other modules each own one domain behavior.
 
+## Frozen v0.1 Runtime Vendor Set
+
+| Component | Exact source artifact | SHA-256 | SPDX | Private namespace and selected source | Modification status |
+|---|---|---|---|---|---|
+| PyYAML 6.0.2 | `https://files.pythonhosted.org/packages/54/ed/79a089b6be93607fa5cdaedf301d7dfb23af5f25c398d5ead2525b063e17/pyyaml-6.0.2.tar.gz` | `d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e` | MIT | `src/agent_stack/_vendor/yaml/**`, selected from the sdist's pure-Python `lib/yaml/**`; Cython, `_yaml` extension, tests, and examples are excluded | modified only by relocation under `agent_stack._vendor`; relative imports and copyright notices are preserved |
+| fastjsonschema 2.21.1 | `https://files.pythonhosted.org/packages/8b/50/4b769ce1ac4071a1ef6d86b1a3fb56cdc3a37615e8c5519e1af96cdac366/fastjsonschema-2.21.1.tar.gz` | `794d4f0a58f848961ba16af7b9c85a3e88cd360df008c59aac6fc5ae9323b5d4` | BSD-3-Clause | `src/agent_stack/_vendor/fastjsonschema/**`, selected from the sdist's runtime package; tests, docs, and benchmarks are excluded | modified only by relocation under `agent_stack._vendor`; relative imports and copyright notices are preserved |
+
+`vendor/runtime-vendor-lock.json` is a closed schema object that records the table above plus every selected upstream path, upstream byte hash, installed private path, installed byte hash, exclusion rule, license-file hash, and modification description. `tools/vendor/sync_runtime_vendor.py` accepts only these two exact source archives, verifies the archive hash before parsing, regenerates into a temporary tree, and either atomically replaces the private vendor roots or exits nonzero in `--check` mode. Any unregistered file under `src/agent_stack/_vendor/`, missing locked file, changed installed byte, alternate source URL/hash, or top-level `yaml`/`fastjsonschema` import is a hard failure. Adding a provider helper requires an approved update to this same lock before provider code changes.
+
 ---
 
 ### Task 1: Bootstrap the Python package and test harness
@@ -71,12 +90,21 @@ api.py is the only downstream import surface. schema_catalog.py loads versioned 
 **Files:**
 - Create: pyproject.toml
 - Create: src/agent_stack/__init__.py
+- Create: src/agent_stack/_vendor/__init__.py
+- Create: src/agent_stack/_vendor/yaml/
+- Create: src/agent_stack/_vendor/fastjsonschema/
 - Create: src/agent_stack/core/__init__.py
+- Create: schemas/core/runtime-vendor-lock.v1.json
+- Create: vendor/runtime-vendor-lock.json
+- Create: vendor/licenses/PyYAML-6.0.2.txt
+- Create: vendor/licenses/fastjsonschema-2.21.1.txt
+- Create: tools/vendor/sync_runtime_vendor.py
 - Create: tests/conftest.py
 - Create: tests/contracts/core/test_package_contract.py
+- Create: tests/contracts/core/test_runtime_vendor_lock.py
 
 **Interfaces:**
-- Produces: importable agent_stack package, Python range, empty runtime dependency set, pytest/Ruff/mypy commands.
+- Produces: importable agent_stack package, Python range, empty runtime dependency set, the closed runtime-vendor lock, reproducible private vendor tree, pytest/Ruff/mypy commands.
 - Consumes: none.
 
 - [ ] **Step 1: Write the failing package contract**
@@ -87,14 +115,16 @@ def test_core_api_is_importable():
     assert api.CORE_INTERFACE_VERSION == 1
 ~~~
 
+Add contract tests that verify the two exact source URLs/archive hashes/SPDX expressions, every selected/upstream/installed file hash, full license bytes, namespace-only modification records, deterministic regeneration, rejection of unregistered vendor files, absence of top-level vendor imports, and equality between the lock inventory and `src/agent_stack/_vendor/`.
+
 - [ ] **Step 2: Verify RED**
 
-Run: uv run pytest tests/contracts/core/test_package_contract.py -q
-Expected: FAIL because pyproject.toml/package/api.py do not exist.
+Run: `uv run pytest tests/contracts/core/test_package_contract.py tests/contracts/core/test_runtime_vendor_lock.py -q`
+Expected: FAIL because the package, vendor lock, sync tool, private vendor tree, and API do not exist.
 
 - [ ] **Step 3: Add minimal scaffold**
 
-Create pyproject.toml with build-system, package discovery under src, requires-python >=3.11,<3.15, no project.dependencies, and dev groups for pytest, hypothesis, ruff, mypy, build. Create api.py with CORE_INTERFACE_VERSION = 1 only.
+Create pyproject.toml with build-system, package discovery under src, requires-python >=3.11,<3.15, no project.dependencies, and dev groups for pytest, hypothesis, ruff, mypy, build. Create api.py with CORE_INTERFACE_VERSION = 1 only. Add the closed vendor-lock schema and exact two-component lock, copy the verified full license texts, implement the hash-before-extract deterministic sync tool, and generate only the locked pure-Python files under the private namespace. Do not add a generic dependency resolver or an implementation-time version selector.
 
 - [ ] **Step 4: Verify GREEN and tool discovery**
 
@@ -102,18 +132,19 @@ Run:
 
 ~~~bash
 uv sync
-uv run pytest tests/contracts/core/test_package_contract.py -q
+uv run python tools/vendor/sync_runtime_vendor.py --check
+uv run pytest tests/contracts/core/test_package_contract.py tests/contracts/core/test_runtime_vendor_lock.py -q
 uv run ruff check src tests
 uv run mypy src
 ~~~
 
-Expected: one passing test and clean lint/type output.
+Expected: deterministic vendoring check, contract tests, lint, and type checks pass; a second regeneration produces zero diff.
 
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add pyproject.toml uv.lock src/agent_stack tests/conftest.py tests/contracts/core/test_package_contract.py
-git commit -m "Bootstrap agent stack core package"
+git add pyproject.toml uv.lock src/agent_stack schemas/core/runtime-vendor-lock.v1.json vendor tools/vendor tests/conftest.py tests/contracts/core
+git commit -m "Bootstrap core package and freeze runtime vendors"
 ~~~
 
 ### Task 2: Implement duplicate-safe parsing, schema catalog, and canonical digests
@@ -408,6 +439,7 @@ Run:
 
 ~~~bash
 uv run pytest tests/unit/core tests/contracts/core tests/property/core tests/integration/core -q
+uv run python tools/vendor/sync_runtime_vendor.py --check
 uv run ruff check src tests
 uv run mypy src
 ~~~
@@ -435,10 +467,10 @@ assert not m.get_all("Requires-Dist")
 PY
 ~~~
 
-Expected: tests/lint/types/build pass; runtime Requires-Dist remains empty.
+Expected: tests/lint/types/build pass; runtime Requires-Dist remains empty; the vendor tree and full-license inputs exactly match the frozen lock. This `uv build` is a component packaging smoke check, not the final release artifact. Core is `integration-complete` because it has no deferred cross-feature implementation port, which unlocks Providers.
 
 ## Implementation Constraint Prompt
 
 ~~~text
-Read the approved core feature spec and this plan before editing. The approved spec and frozen interface are authoritative; stop on conflict. Execute under the current route/integration contract. Use strict TDD for every behavior-changing step: write the focused failing test, run it and confirm the expected failure, implement the smallest change, rerun to green, then refactor. Do not implement providers, rendering/reconciliation, task state, route adapters, lifecycle CLI, or release behavior in this plan. Run the focused validation and full Task 1 suite before completion. Do not mark complete if validation was not executed.
+Read the approved core feature spec and this plan before editing. The approved spec and frozen interface are authoritative; stop on conflict. Execute under the current route/integration contract. Use strict TDD for every behavior-changing step: write the focused failing test, run it and confirm the expected failure, implement the smallest change, rerun to green, then refactor. Freeze and verify exactly the two declared runtime vendors before schema implementation; do not add or upgrade vendor entries during later tasks. Do not implement providers, rendering/reconciliation, task state, route adapters, lifecycle CLI, or release behavior in this plan. Run the focused validation, deterministic vendor check, and full Task 1 suite before completion. Do not mark complete if validation was not executed.
 ~~~

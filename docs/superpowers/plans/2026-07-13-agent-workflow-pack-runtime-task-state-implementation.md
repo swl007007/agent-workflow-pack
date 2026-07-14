@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Source: docs/superpowers/specs/2026-07-13-agent-workflow-pack-runtime-task-state-design.md, producer C 0bc82617df4ea6f09b59c827ab925faf36904b49.
-- Prerequisites: Core, Providers, and Renderer/Reconciler implementations complete.
+- Prerequisites: Core and Providers are integration-complete, Lifecycle Tasks 1-3 are release-kernel component-complete, and Renderer is component-complete through Task 7. Route implementation is not a prerequisite for Runtime component work because Runtime consumes frozen verifier ports.
 - Launcher is sole pre-wheel authority; descriptor is post-wheel validation only.
 - Bootstrap may download only the exact hash-bound wheel and never Python/secondary packages.
 - Workspace migration never edits or resumes Trellis task state.
@@ -21,6 +21,12 @@
 - Existing-task load never requires the stale create Decision.
 - Task-state Service ordinary writes are limited to its frozen authority paths.
 - Strict TDD for behavior changes; no production implementation until plan approval.
+
+## Cross-Plan Execution DAG and Completion States
+
+The fixed implementation order is Core -> Providers -> Lifecycle Tasks 1-3 release kernel -> Renderer component -> Runtime component -> Route/bindings -> Lifecycle Tasks 4-9. Runtime consumes the real early release kernel, not a release fake. Runtime defines injected ports that exactly match the frozen Route callables `verify_route_decision(RouteDecision, VerifiedRouteAuthoritySnapshot, RouteConsumer)` and `verify_task_creation_approval(ApprovalProof, VerifiedCreateIntegratedTaskDecision, CapabilityManifest, VerifiedPlatformRuntimeContext)`; contract fakes are test-only until Route is implemented.
+
+`component-complete` means Runtime unit/contract/property/crash tests pass with the real release kernel, real Renderer APIs, real Runtime scanner, and test-only Route port fakes. It is not final integration. `integration-complete` requires Route Task 8 to bind the real calculator/verifiers and pass the named cross-module admission/runtime-load tests with no production fake or optional verifier fallback.
 
 ## File Structure
 
@@ -35,6 +41,7 @@ src/agent_stack/runtime/
   caller_context.py
   authority.py
   maintenance.py
+  ports.py
   workspace.py
   scanner.py
   integration.py
@@ -67,7 +74,7 @@ tests/fixtures/runtime/
 
 **Interfaces:**
 - Produces: bootstrap_project_runtime(), rendered launcher constants/argv.
-- Consumes: Task 6-supplied verified release substitutions at render time.
+- Consumes: verified substitutions produced by the real Lifecycle Tasks 1-3 release kernel; final publication remains owned by Lifecycle Tasks 4-9.
 
 - [ ] **Step 1: RED launcher tests**
 
@@ -107,7 +114,7 @@ git commit -m "Add pinned project runtime launcher"
 
 **Interfaces:**
 - Produces: VerifiedCallerContext, verify_runtime_authority(), select_recovery_runtime().
-- Consumes: Task 6 release verifier, committed/candidate Manifest/plan, Task 3 journals.
+- Consumes: the real `lifecycle.release.v1` kernel callables from Lifecycle Tasks 1-3, committed/candidate Manifest/plan, and Task 3 journals. It does not import Lifecycle CLI composition.
 
 - [ ] **Step 1: RED tests**
 
@@ -179,34 +186,35 @@ git commit -m "Register clone-local workspace state"
 - Create: src/agent_stack/runtime/scanner.py
 - Test: tests/unit/runtime/test_scanner.py
 - Test: tests/property/runtime/test_scanner_bounds.py
+- Test: tests/integration/runtime/test_reconciler_scanner_binding.py
 - Add fixtures: tests/fixtures/runtime/trellis_layouts/
 
 **Interfaces:**
-- Produces: scan_task_quiescence(source_layout, target_layout, source_schemas, target_schemas).
-- Consumes: Core verified layout/snapshot/finding schemas.
+- Produces: scan_task_quiescence(source_layout, target_layout, source_schemas, target_schemas) and the real binding for Renderer `TaskQuiescenceScannerPort`.
+- Consumes: Core verified layout/snapshot/finding schemas and Renderer component-complete scanner port; it does not consume Renderer task semantics.
 
 - [ ] **Step 1: RED tests**
 
-Cover source/target active/archive union, one-segment grammar, integration recognition, metadata parser/classifier, task-journal phase table, missing/unknown/wrong-type/symlink/oversized/overcount/overdepth/case/Unicode states, duplicate UUID/ref/path conflicts, and stranded one-sided state.
+Cover source/target active/archive union, one-segment grammar, integration recognition, metadata parser/classifier, task-journal phase table, missing/unknown/wrong-type/symlink/oversized/overcount/overdepth/case/Unicode states, duplicate UUID/ref/path conflicts, and stranded one-sided state. Add the Renderer binding test for exact port signature, real planning/commit-time double scan, stale snapshot error, and lock order.
 
 - [ ] **Step 2: Verify RED**
 
-Run: `uv run pytest tests/unit/runtime/test_scanner.py tests/property/runtime/test_scanner_bounds.py -q`
+Run: `uv run pytest tests/unit/runtime/test_scanner.py tests/property/runtime/test_scanner_bounds.py tests/integration/runtime/test_reconciler_scanner_binding.py -q`
 Expected: FAIL on absent scanner.
 
 - [ ] **Step 3: Implement fact-only bounded scan**
 
-Return canonical snapshot/findings with stable order. Do not emit command blockers or run source code.
+Return canonical snapshot/findings with stable order. Bind this callable to Renderer through the frozen Protocol without an adapter-specific second scanner. Do not emit command blockers or run source code.
 
 - [ ] **Step 4: Verify GREEN**
 
-Run: `uv run pytest tests/unit/runtime/test_scanner.py tests/property/runtime/test_scanner_bounds.py -q`
-Expected: no skipped or truncated ambiguous state.
+Run: `uv run pytest tests/unit/runtime/test_scanner.py tests/property/runtime/test_scanner_bounds.py tests/integration/runtime/test_reconciler_scanner_binding.py -q`
+Expected: no skipped or truncated ambiguous state; the real binding makes Renderer integration-complete.
 
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add src/agent_stack/runtime/scanner.py tests/unit/runtime/test_scanner.py tests/property/runtime/test_scanner_bounds.py tests/fixtures/runtime
+git add src/agent_stack/runtime/scanner.py tests/unit/runtime/test_scanner.py tests/property/runtime/test_scanner_bounds.py tests/integration/runtime/test_reconciler_scanner_binding.py tests/fixtures/runtime
 git commit -m "Implement bounded Trellis task scanner"
 ~~~
 
@@ -220,7 +228,7 @@ git commit -m "Implement bounded Trellis task scanner"
 
 **Interfaces:**
 - Produces: migrate_workspace(), recover_workspace_migration().
-- Consumes: Task 6 static release evidence, scanner, Core evaluators, exact migration functions.
+- Consumes: static verified source evidence from the real Lifecycle Tasks 1-3 release kernel, the Runtime scanner, Core evaluators, and exact migration functions.
 
 - [ ] **Step 1: RED tests**
 
@@ -251,40 +259,42 @@ git commit -m "Migrate clone-local workspace contracts"
 
 **Files:**
 - Create: src/agent_stack/runtime/integration.py
+- Create: src/agent_stack/runtime/ports.py
 - Create: src/agent_stack/runtime/replay.py
 - Create: src/agent_stack/runtime/outbox.py
 - Create: schemas/runtime/integration.v1.json
 - Create: schemas/runtime/task-outbox.v1.json
 - Test: tests/contracts/runtime/test_integration.py
+- Test: tests/contracts/runtime/test_route_verifier_ports.py
 - Test: tests/unit/runtime/test_replay.py
 - Test: tests/unit/runtime/test_outbox.py
 
 **Interfaces:**
-- Produces: validate_integration(), reserve/consume_proof(), enqueue/deliver_effect().
-- Consumes: Core task contract/surface digests and Task 5 proof schema.
+- Produces: validate_integration(), reserve/consume_proof(), enqueue/deliver_effect(), `RouteDecisionVerifierPort`, and `TaskCreationApprovalVerifierPort`.
+- Consumes: Core task contract/surface digests plus the already frozen RouteDecision/ApprovalProof schemas and Route verifier callable signatures. It does not consume Task 5 implementation during the component phase.
 
 - [ ] **Step 1: RED tests**
 
-Test closed mode union, workflow contract digest, mandatory surfaces, UUID/ref semantics, status/revision/claim invariants, proof key excluding transaction, absent->reserved->consumed, TTL recovery, journal-before-reservation rollback, missing/corrupt ledger, deterministic outbox keys, idempotent delivery.
+Test closed mode union, workflow contract digest, mandatory surfaces, UUID/ref semantics, status/revision/claim invariants, proof key excluding transaction, absent->reserved->consumed, TTL recovery, journal-before-reservation rollback, missing/corrupt ledger, deterministic outbox keys, idempotent delivery. Test both injected Route ports for exact frozen arguments/results, rejection of absent ports in production composition, and contract fakes that return only schema-valid verified values.
 
 - [ ] **Step 2: Verify RED**
 
-Run: `uv run pytest tests/contracts/runtime/test_integration.py tests/unit/runtime/test_replay.py tests/unit/runtime/test_outbox.py -q`
+Run: `uv run pytest tests/contracts/runtime/test_integration.py tests/contracts/runtime/test_route_verifier_ports.py tests/unit/runtime/test_replay.py tests/unit/runtime/test_outbox.py -q`
 Expected: FAIL on missing modules.
 
 - [ ] **Step 3: Implement monotonic local state**
 
-Use whole-file CAS for replay and immutable outbox item creation/closed delivery transitions. No lifecycle authority from outbox status.
+Use whole-file CAS for replay and immutable outbox item creation/closed delivery transitions. Define the two Route Protocols without importing Task 5 modules and without a production default/fake. No lifecycle authority comes from outbox status.
 
 - [ ] **Step 4: Verify GREEN**
 
-Run: `uv run pytest tests/contracts/runtime/test_integration.py tests/unit/runtime/test_replay.py tests/unit/runtime/test_outbox.py -q`
+Run: `uv run pytest tests/contracts/runtime/test_integration.py tests/contracts/runtime/test_route_verifier_ports.py tests/unit/runtime/test_replay.py tests/unit/runtime/test_outbox.py -q`
 Expected: all invalid state transitions fail closed.
 
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add src/agent_stack/runtime/integration.py src/agent_stack/runtime/replay.py src/agent_stack/runtime/outbox.py schemas/runtime tests
+git add src/agent_stack/runtime/integration.py src/agent_stack/runtime/ports.py src/agent_stack/runtime/replay.py src/agent_stack/runtime/outbox.py schemas/runtime tests
 git commit -m "Add integration replay and task outbox state"
 ~~~
 
@@ -302,11 +312,11 @@ git commit -m "Add integration replay and task outbox state"
 
 **Interfaces:**
 - Produces: admit_task(), claim_task(), transition_task(), release_task(), archive_task(), recover_task_transaction().
-- Consumes: Task 5 verified Decision/proof, Task 3 CAS, locked Trellis adapter candidates.
+- Consumes: verified Decision/proof values obtained through the injected Route verifier ports, Task 3 CAS, and locked Trellis adapter candidates. Component tests use contract fakes; no Route implementation import is permitted.
 
 - [ ] **Step 1: RED transaction tests**
 
-Cover duplicate UUID/ref, deterministic task tree, planned-before-reservation, every admission phase, admitting non-runnable, metadata commit, two claimants, foreign claim, phase transitions, completed prerequisite, collision-free archive destination, every archive phase, outbox cleanup, and rollback third state.
+Cover duplicate UUID/ref, deterministic task tree, planned-before-reservation, every admission phase, admitting non-runnable, metadata commit, two claimants, foreign claim, phase transitions, completed prerequisite, collision-free archive destination, every archive phase, outbox cleanup, and rollback third state. Contract fakes must record exact Decision/proof inputs and return only frozen verified-result types; missing, mismatched, or reused fake evidence fails before mutation.
 
 - [ ] **Step 2: Verify RED**
 
@@ -315,12 +325,12 @@ Expected: FAIL on missing service.
 
 - [ ] **Step 3: Implement phase machines**
 
-Admission commit is integration admitting->active revision 2 after metadata. Archive commit is archiving->archived after move/metadata. Precommit is reversible file work only; postcommit is outbox/cleanup.
+Admission commit is integration admitting->active revision 2 after metadata. Archive commit is archiving->archived after move/metadata. Precommit is reversible file work only; postcommit is outbox/cleanup. All Decision/proof verification is delegated to injected ports; Task-state does not recreate Route policy.
 
 - [ ] **Step 4: Verify GREEN**
 
 Run: `uv run pytest tests/integration/runtime/test_task_admission.py tests/integration/runtime/test_task_mutation.py tests/integration/runtime/test_task_archive.py tests/concurrency/runtime/test_task_killpoints.py -q && uv run pytest tests/concurrency/runtime/test_task_killpoints.py -q`
-Expected: no partially accepted task state.
+Expected: no partially accepted task state. This is Runtime component GREEN with Route contract fakes, not Route integration.
 
 - [ ] **Step 5: Commit**
 
@@ -356,7 +366,7 @@ Expected: FAIL on missing loader.
 
 Hold runtime-state snapshot through complete bundle construction and recheck. Dispatch from memory only and return no reusable authority.
 
-- [ ] **Step 4: Verify GREEN and full Task 4 suite**
+- [ ] **Step 4: Verify GREEN and full Runtime component suite**
 
 Run: `uv run pytest tests/unit/runtime tests/contracts/runtime tests/property/runtime tests/integration/runtime tests/concurrency/runtime tests/e2e/runtime -q && uv run ruff check src/agent_stack/runtime tests && uv run mypy src/agent_stack/runtime`
 Expected: pass.
@@ -368,12 +378,20 @@ git add src/agent_stack/runtime/runtime_load.py src/agent_stack/runtime/api.py s
 git commit -m "Authorize existing-task runtime dispatch"
 ~~~
 
+## Runtime Integration-Complete Gate
+
+Runtime is only `component-complete` after Task 8. Route Task 8 owns `tests/integration/route/test_runtime_verifier_binding.py`, which composes the real `verify_route_decision` and `verify_task_creation_approval` implementations into the Runtime ports. The test must cover real create-integrated-task admission, replay consumption, route/approval failure before mutation, task surface closure, existing-task runtime load without Decision replay, and proof that no contract fake or fallback verifier is reachable in production composition.
+
+Run after Route Task 8: `uv run pytest tests/integration/route/test_runtime_verifier_binding.py tests/integration/runtime/test_task_admission.py tests/integration/runtime/test_runtime_load.py tests/integration/route/test_wrappers.py -q`
+
+Expected: PASS with real Route implementations. Only then are Runtime and Route `integration-complete`, unlocking Lifecycle Tasks 4-9.
+
 ## Global Validation
 
-Run full runtime suite including launcher shell tests and all crash boundaries. Verify launcher/doctor/migrate task_quiescence equality. Verify only Task 4 authority paths changed in filesystem fixtures. Run uv build.
+For component-complete, run the full Runtime suite including launcher shell tests, all crash boundaries, the real release kernel, the real Renderer scanner binding, and Route contract fakes. Verify launcher/doctor/migrate task_quiescence equality and only Task 4 authority paths changed in fixtures. For integration-complete, additionally run the real Route binding gate above. Run uv build only as a component packaging smoke check; it is not a final release artifact.
 
 ## Implementation Constraint Prompt
 
 ~~~text
-Read the approved Runtime/Task-State spec and this plan. Stop on any frozen-interface conflict. Use strict TDD and observe RED before behavior code. The launcher is sole pre-wheel authority, workspace migration is local-only, Task-state Service writes only authorized paths, and existing-task load never uses the create Decision. Do not implement platform wrapper semantics or release publication. Run launcher, scanner, migration, task-transaction, replay, runtime-load, crash, and concurrency suites before completion.
+Read the approved Runtime/Task-State spec and this plan. Stop on any frozen-interface conflict. Use strict TDD and observe RED before behavior code. Consume the real Lifecycle Tasks 1-3 release kernel. Use injected frozen Route verifier ports with test-only contract fakes; do not import Route implementation or ship a fallback. The launcher is sole pre-wheel authority, workspace migration is local-only, Task-state Service writes only authorized paths, and existing-task load never uses the create Decision. Do not implement platform wrapper semantics or release publication. Report component-complete after the fake-port suite and integration-complete only after Route Task 8's real binding gate. Run launcher, scanner, migration, task-transaction, replay, runtime-load, crash, and concurrency suites before completion.
 ~~~

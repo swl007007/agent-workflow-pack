@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - Source: docs/superpowers/specs/2026-07-13-agent-workflow-pack-route-adapters-design.md, producer C 9148cc0620f7c58fbcf058d08f592e0b47ca00f8.
-- Prerequisites: Tasks 1, 3, and 4 implementations complete.
+- Prerequisites: Core is integration-complete, Renderer is integration-complete through Runtime Task 4's real scanner binding, and Runtime is component-complete through Task 8 with frozen Route port fakes.
 - Task 1 owns RouteDecision/ApprovalProof/CapabilityManifest schemas; Task 5 only populates/verifies them.
 - Natural-language signal completeness is not a security guarantee.
 - classify-only is never executable.
@@ -21,6 +21,12 @@
 - Integrated existing-task wrappers call task runtime load and never replay create Decision.
 - No nested top-level orchestrator; heavy-development-router alone owns heavy top-level flow.
 - Strict TDD for behavior changes; plan requires separate approval.
+
+## Cross-Plan Execution DAG and Completion States
+
+Route executes after Runtime component-complete, not before it. Runtime's test-only ports already match this plan's frozen `verify_route_decision` and `verify_task_creation_approval` signatures, so Route Tasks 1-7 can implement the real calculators/verifiers/platform semantics against stable contracts. Task 8 replaces those fakes in the production composition and runs the cross-module admission/runtime-load gate. Route does not become Runtime's top-level orchestrator; `heavy-development-router` remains the sole heavy top-level orchestrator.
+
+`component-complete` for Route means its policy, Decision, approval, surface, capability, projection, and wrapper tests pass in isolation. `integration-complete` requires Task 8's real Runtime binding test and proves no test fake, optional verifier, or duplicate policy path is reachable. Lifecycle Tasks 4-9 remain locked until both Route and Runtime are integration-complete.
 
 ## File Structure
 
@@ -336,29 +342,30 @@ git commit -m "Project deterministic platform adapters"
 - Create: src/agent_stack/route/wrappers.py
 - Modify: src/agent_stack/route/api.py
 - Test: tests/integration/route/test_wrappers.py
+- Test: tests/integration/route/test_runtime_verifier_binding.py
 - Test: tests/golden/route/test_wrapper_outputs.py
 
 **Interfaces:**
-- Produces: invoke_execute_light(), invoke_integrated_wrapper().
+- Produces: invoke_execute_light(), invoke_integrated_wrapper(), and the production composition binding of real Route verifiers to Runtime's frozen ports.
 - Consumes: verified execute-light Decision or Runtime load_task_runtime().
 
 - [ ] **Step 1: RED tests**
 
-Test classify-only rejection, execute-light one-shot/native-only/no task state, integrated exact runtime-load args, no create Decision replay, repository launcher path, no PATH/global tool, no catalog read/reopen, maintenance/phase/claim errors, heavy router sole top-level, and direct entry bypass detection.
+Test classify-only rejection, execute-light one-shot/native-only/no task state, integrated exact runtime-load args, no create Decision replay, repository launcher path, no PATH/global tool, no catalog read/reopen, maintenance/phase/claim errors, heavy router sole top-level, and direct entry bypass detection. Add a real-binding test for create-integrated-task admission, direct-human approval, replay consumption, pre-mutation failure, surface closure, and absence of Runtime contract fakes in production composition.
 
 - [ ] **Step 2: Verify RED**
 
-Run: `uv run pytest tests/integration/route/test_wrappers.py tests/golden/route/test_wrapper_outputs.py -q`
+Run: `uv run pytest tests/integration/route/test_wrappers.py tests/integration/route/test_runtime_verifier_binding.py tests/golden/route/test_wrapper_outputs.py -q`
 Expected: FAIL on missing wrappers.
 
 - [ ] **Step 3: Implement two closed branches**
 
-Native-light consumes fresh Decision. Integrated delegates all authorization/bundle construction to Task 4 and dispatches only returned bundle.
+Native-light consumes a fresh Decision. Integrated wrappers delegate all existing-task authorization/bundle construction to Task 4 and dispatch only the returned bundle. Production composition supplies the real Route verifier objects to Runtime's required ports; it contains no fake or fallback.
 
 - [ ] **Step 4: Verify GREEN and full Task 5 suite**
 
-Run: `uv run pytest tests/unit/route tests/contracts/route tests/property/route tests/golden/route tests/integration/route -q && uv run ruff check src/agent_stack/route tests && uv run mypy src/agent_stack/route`
-Expected: pass.
+Run: `uv run pytest tests/unit/route tests/contracts/route tests/property/route tests/golden/route tests/integration/route tests/integration/runtime/test_task_admission.py tests/integration/runtime/test_runtime_load.py -q && uv run ruff check src/agent_stack/route tests && uv run mypy src/agent_stack/route`
+Expected: pass with the real Runtime binding; Route and Runtime are integration-complete.
 
 - [ ] **Step 5: Commit**
 
@@ -369,10 +376,10 @@ git commit -m "Add route-gated platform wrappers"
 
 ## Global Validation
 
-Run test-routing golden suite across supported Claude Code, Codex, and OpenCode fixtures. Re-enumerate auto-discovery and runtime surfaces. Verify no direct integrated/heavy bypass and no route-gated content leakage. Run uv build.
+Run the test-routing golden suite across supported Claude Code, Codex, and OpenCode fixtures. Re-enumerate auto-discovery and runtime surfaces. Run `tests/integration/route/test_runtime_verifier_binding.py` with the Runtime admission/load suites and verify no contract fake, direct integrated/heavy bypass, duplicate verifier, or route-gated content leakage. Run uv build only as a component packaging smoke check; final release artifacts remain Lifecycle-owned.
 
 ## Implementation Constraint Prompt
 
 ~~~text
-Read the approved Route/Adapters spec and this plan. Stop on conflicts with Core or Runtime frozen APIs. Use strict TDD and observe RED before code. Do not redefine RouteDecision, ApprovalProof, CapabilityManifest, task lifecycle, runtime-load authorization, or ownership. Keep heavy-development-router as the sole heavy top-level orchestrator. Integrated wrappers must call task runtime load and never replay the create Decision or open the gated catalog. Run all routing, surface, capability, wrapper, and three-platform golden tests before completion.
+Read the approved Route/Adapters spec and this plan. Stop on conflicts with Core or Runtime frozen APIs. Use strict TDD and observe RED before code. Do not redefine RouteDecision, ApprovalProof, CapabilityManifest, task lifecycle, runtime-load authorization, or ownership. Keep heavy-development-router as the sole heavy top-level orchestrator. Integrated wrappers must call task runtime load and never replay the create Decision or open the gated catalog. Replace Runtime's contract fakes only through the required production ports and run the real binding gate. Do not report integration-complete until routing, surface, capability, wrapper, Runtime admission/load, and three-platform golden tests pass together.
 ~~~

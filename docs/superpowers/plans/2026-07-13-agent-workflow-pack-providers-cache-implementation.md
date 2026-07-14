@@ -8,12 +8,14 @@
 
 **Architecture:** Provider code is isolated under agent_stack.providers and returns immutable verified evidence to the Renderer. Cache and attempt state live outside target projects, use OS locks plus atomic promotion, and never become project authority. A first-party broker separates durable attempt preparation from third-party process release.
 
-**Tech Stack:** Python 3.11-3.14, Task 1 core API, stdlib networking/process/archive primitives with locked pure-Python vendored helpers where required, pytest/Hypothesis, Linux/WSL process controls.
+**Tech Stack:** Python 3.11-3.14, Task 1 Core API, stdlib networking/process/archive primitives, the already frozen private PyYAML 6.0.2 and fastjsonschema 2.21.1 entries only through Core schema services, pytest/Hypothesis, Linux/WSL process controls.
 
 ## Global Constraints
 
 - Source: docs/superpowers/specs/2026-07-13-agent-workflow-pack-providers-cache-design.md, producer C b19e57a0e4d6e5094b853d428909e4d10d2283de.
 - Prerequisite: approved Core implementation and core.schema-catalog.v1/core.errors.v1 behavior.
+- Prerequisite includes a passing `tools/vendor/sync_runtime_vendor.py --check` against `vendor/runtime-vendor-lock.json`; Providers may not select or vendor dependencies.
+- Provider production modules use stdlib and public `agent_stack.core` APIs. Direct imports from `agent_stack._vendor` and undeclared third-party imports are rejected.
 - Provider/cache code never writes the target project.
 - Archive full-byte hash precedes format parsing, enumeration, or extraction.
 - Provider exception approval requires the frozen direct-human branch; model input cannot approve.
@@ -48,6 +50,10 @@ tests/concurrency/providers/
 tests/fixtures/providers/
 ~~~
 
+## Runtime Vendor Consumption Contract
+
+The only v0.1 runtime vendor authority is `vendor/runtime-vendor-lock.json`, frozen by Core Task 1. Its permitted entries are PyYAML 6.0.2 (`d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e`, MIT) and fastjsonschema 2.21.1 (`794d4f0a58f848961ba16af7b9c85a3e88cd360df008c59aac6fc5ae9323b5d4`, BSD-3-Clause), installed only under `agent_stack._vendor`. Provider code consumes YAML/schema behavior through `agent_stack.core`; it has no provider-local vendor root or helper download. If implementation evidence shows another helper is required, stop the affected task and amend the Core-owned vendor lock, provenance, full-license inputs, and reproducibility tests before any import or copied byte is added.
+
 ---
 
 ### Task 1: Define provider models, errors, and frozen API
@@ -60,10 +66,11 @@ tests/fixtures/providers/
 - Create: schemas/providers/provider-result.v1.json
 - Create: schemas/providers/provider-failure.v1.json
 - Test: tests/contracts/providers/test_provider_api.py
+- Test: tests/contracts/providers/test_dependency_boundary.py
 
 **Interfaces:**
 - Produces: acquire(), execute_provider(), ProviderPlan, AcquisitionResult, ProviderExecutionResult, ProviderFailure.
-- Consumes: Task 1 SchemaCatalog, canonical digest, structured errors.
+- Consumes: Task 1 SchemaCatalog, canonical digest, structured errors, and the frozen Core vendor-lock boundary; it does not consume a provider-owned dependency-selection mechanism.
 
 - [ ] **Step 1: RED contract test**
 
@@ -75,19 +82,20 @@ def test_provider_api_exports_frozen_callables():
 ~~~
 
 Add schema tests rejecting target paths, ambient env, caller URLs, final reconcile identity, and unknown fields.
+Add an import-graph contract test that rejects external runtime imports and direct `agent_stack._vendor` imports from `src/agent_stack/providers/**`; the allowed dependency surface is stdlib plus public `agent_stack.core` modules.
 
 - [ ] **Step 2: Verify RED**
 
-Run: uv run pytest tests/contracts/providers/test_provider_api.py -q
+Run: `uv run pytest tests/contracts/providers/test_provider_api.py tests/contracts/providers/test_dependency_boundary.py -q`
 Expected: FAIL because provider package is absent.
 
 - [ ] **Step 3: Add immutable models and stubs**
 
-Implement closed dataclasses/enums and ProviderFailure mapping only. Public functions may raise NotImplementedError until later tasks; tests must assert signatures/schema, not behavior.
+Implement closed dataclasses/enums and ProviderFailure mapping only. Public functions may raise NotImplementedError until later tasks; tests must assert signatures/schema, not behavior. Add no dependency or vendor selection code.
 
 - [ ] **Step 4: Verify GREEN**
 
-Run: `uv run pytest tests/contracts/providers/test_provider_api.py -q && uv run ruff check src/agent_stack/providers tests/contracts/providers && uv run mypy src/agent_stack/providers`
+Run: `uv run python tools/vendor/sync_runtime_vendor.py --check && uv run pytest tests/contracts/providers/test_provider_api.py tests/contracts/providers/test_dependency_boundary.py -q && uv run ruff check src/agent_stack/providers tests/contracts/providers && uv run mypy src/agent_stack/providers`
 Expected: pass.
 
 - [ ] **Step 5: Commit**
@@ -191,7 +199,7 @@ git commit -m "Validate provider archives before extraction"
 
 **Interfaces:**
 - Produces: verify_provider_approval(plan, proof, capability, now).
-- Consumes: Core ApprovalProof catalog branch and Task 5 capability schema shape without importing Task 5 implementation.
+- Consumes: Core-owned ApprovalProof and CapabilityManifest schema branches. Tests use schema-valid Core fixtures; there is no Task 5 implementation dependency.
 
 - [ ] **Step 1: RED tests**
 
@@ -342,10 +350,10 @@ git commit -m "Complete secure provider execution"
 
 ## Global Validation
 
-Run the full provider suite twice, including broker SIGKILL tests. Verify git diff contains no target-project writer outside test fixtures. Run uv build and inspect the provider public API.
+Run the full provider suite twice, including broker SIGKILL tests. Run the Core vendor sync in `--check` mode and the provider dependency-boundary test; verify no provider-local vendor root, undeclared external import, or target-project writer exists outside test fixtures. Run uv build only as a component packaging smoke check and inspect the provider public API; it is not a final release artifact. Passing this gate makes Providers `integration-complete` and unlocks Lifecycle Tasks 1-3 only.
 
 ## Implementation Constraint Prompt
 
 ~~~text
-Use the approved Providers/Cache spec and this plan as execution inputs. Stop on conflict with frozen Core APIs. Follow strict TDD for every behavior change and observe the expected RED before production edits. Do not write target-project files, construct reconcile plans, mutate tasks, calculate routes, or publish releases. Cache, attempts, receipts, and provider output are evidence only. Run all provider unit, contract, property, integration, and concurrency tests before completion.
+Use the approved Providers/Cache spec and this plan as execution inputs. Stop on conflict with frozen Core APIs. Follow strict TDD for every behavior change and observe the expected RED before production edits. Consume only the Core-owned frozen runtime vendor lock; do not add provider-local helpers or direct private-vendor imports. Do not write target-project files, construct reconcile plans, mutate tasks, calculate routes, or publish releases. Cache, attempts, receipts, and provider output are evidence only. Run the vendor-boundary check and all provider unit, contract, property, integration, and concurrency tests before completion.
 ~~~

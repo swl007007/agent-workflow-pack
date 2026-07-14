@@ -6,14 +6,15 @@
 
 **Goal:** Compose the complete CLI, structured output, immutable release trust chain, directed compatibility/upgrade flow, self-contained distributions, reproducibility/provenance gates, and full AC-01–AC-64 end-to-end release suite.
 
-**Architecture:** agent_stack.cli is a thin composition layer over Tasks 1-5. agent_stack.release owns Release Identity, detached-manifest trust, compatibility classification, artifact build verification, distribution render digest, and release gates. CI builds wheel/sdist first, creates the detached manifest afterward, publishes an immutable GitHub release, and re-verifies published assets.
+**Architecture:** `agent_stack.release` is split into an early release kernel and a late lifecycle/release composition. Lifecycle Tasks 1-3 implement Release Identity, detached-manifest trust, static source evidence, and directed compatibility before Renderer/Runtime work. After real Renderer, Runtime, and Route bindings are integration-complete, Tasks 4-9 compose the CLI, freeze provenance/licenses/notices, build the final wheel/sdist, run gates on those final bytes, create the detached manifest, publish an immutable GitHub release, and re-verify published assets.
 
 **Tech Stack:** Python 3.11-3.14, uv build/lock, stdlib packaging metadata plus build tooling, GitHub Actions/API, pytest, subprocess E2E fixtures, SPDX/provenance data.
 
 ## Global Constraints
 
 - Source: docs/superpowers/specs/2026-07-13-agent-workflow-pack-lifecycle-release-design.md, producer C afe76961f5e7b3690ecb9e86eb322fff9e31cd30.
-- Prerequisite: Tasks 1-5 implementations and frozen APIs complete.
+- Prerequisite for Lifecycle Tasks 1-3: Core and Providers integration-complete.
+- Prerequisite for Lifecycle Tasks 4-9: release-kernel component-complete plus Renderer, Runtime, and Route integration-complete with all cross-feature fakes replaced.
 - CLI composition cannot redefine domain semantics/errors.
 - Wheel runtime Requires-Dist must be empty.
 - release-manifest.json is detached and absent from wheel/sdist/source tree.
@@ -23,6 +24,19 @@
 - Compatibility is exact and directed; no latest lookup or arbitrary rollback.
 - Strict TDD applies to behavior; release metadata generation uses deterministic artifact checks written before generator code.
 - No implementation until this plan is separately approved.
+
+## Cross-Plan Execution DAG and Completion States
+
+The fixed waves are:
+
+1. Core -> Providers.
+2. Lifecycle Tasks 1-3 -> `release-kernel component-complete`; then stop this plan.
+3. Renderer component-complete through frozen scanner port tests.
+4. Runtime component-complete using the real release kernel and test-only Route verifier ports; Runtime Task 4 makes Renderer integration-complete.
+5. Route Task 8 binds real verifiers, making Route and Runtime integration-complete.
+6. Resume Lifecycle Tasks 4-9. Task 6 freezes provenance/licenses/notices, Task 7 builds and gates final distributions, Task 8 publishes, and Task 9 closes E2E.
+
+`release-kernel component-complete` is narrower than Lifecycle component-complete: only the Task 1-3 public release APIs and tests pass, with no CLI, distribution build, publication, or system-completion claim. `integration-complete` is granted only after Tasks 4-9 use real cross-feature implementations and the final artifact/E2E gates pass.
 
 ## File Structure
 
@@ -38,6 +52,7 @@ src/agent_stack/
   release/
     __init__.py
     api.py
+    kernel.py
     identity.py
     trust.py
     manifest.py
@@ -75,6 +90,7 @@ tests/fixtures/e2e/
 
 **Files:**
 - Create: src/agent_stack/release/api.py
+- Create: src/agent_stack/release/kernel.py
 - Create: src/agent_stack/release/identity.py
 - Create: src/agent_stack/release/errors.py
 - Create: schemas/release/release-identity.v1.json
@@ -83,28 +99,29 @@ tests/fixtures/e2e/
 - Create: schemas/release/release-compatibility.v1.json
 - Create: schemas/release/release-gate-result.v1.json
 - Test: tests/contracts/release/test_release_api.py
+- Test: tests/contracts/release/test_release_kernel_boundary.py
 - Test: tests/property/release/test_release_identity.py
 
 **Interfaces:**
-- Produces: lifecycle.release.v1 schemas/callables and non-self-referential release_id().
+- Produces: lifecycle.release.v1 schemas/callables, non-self-referential release_id(), and a release-kernel import boundary that contains no CLI/Renderer/Runtime/Route imports.
 - Consumes: Core canonicalization.
 
 - [ ] **Step 1: RED tests**
 
-Test identical Release Identity across wheel/sdist/Git form, repository/distribution/version sensitivity, excluded source/hash/URL fields, manifest no self digest, compatibility no self/source/container fields, and public API signatures.
+Test identical Release Identity across wheel/sdist/Git form, repository/distribution/version sensitivity, excluded source/hash/URL fields, manifest no self digest, compatibility no self/source/container fields, and public API signatures. Test that `agent_stack.release.kernel` exports only the Task 1-3 release callables/types and cannot import `agent_stack.cli`, reconcile, runtime, or route modules.
 
 - [ ] **Step 2: Verify RED**
 
-Run: `uv run pytest tests/contracts/release/test_release_api.py tests/property/release/test_release_identity.py -q`
+Run: `uv run pytest tests/contracts/release/test_release_api.py tests/contracts/release/test_release_kernel_boundary.py tests/property/release/test_release_identity.py -q`
 Expected: FAIL because release package is absent.
 
 - [ ] **Step 3: Implement immutable release models and identity**
 
-Only repository_id, distribution_name, version enter Release Identity.
+Only repository_id, distribution_name, version enter Release Identity. Define the release-kernel public module as a leaf API; Tasks 2-3 fill its verifier/compatibility callables without importing late lifecycle composition.
 
 - [ ] **Step 4: Verify GREEN**
 
-Run: `uv run pytest tests/contracts/release/test_release_api.py tests/property/release/test_release_identity.py -q && uv run ruff check src/agent_stack/release tests/contracts/release tests/property/release && uv run mypy src/agent_stack/release`
+Run: `uv run pytest tests/contracts/release/test_release_api.py tests/contracts/release/test_release_kernel_boundary.py tests/property/release/test_release_identity.py -q && uv run ruff check src/agent_stack/release tests/contracts/release tests/property/release && uv run mypy src/agent_stack/release`
 Expected: pass.
 
 - [ ] **Step 5: Commit**
@@ -124,7 +141,7 @@ git commit -m "Define release identity and manifest contracts"
 - Test: tests/integration/release/test_manifest_verification.py
 
 **Interfaces:**
-- Produces: verify_release_manifest(locator, packaged_policy).
+- Produces: release-kernel `verify_release_manifest(locator, packaged_policy)` and `VerifiedRelease` evidence consumable before late lifecycle composition.
 - Consumes: Provider verified download/cache and exact GitHub release metadata.
 
 - [ ] **Step 1: RED tests**
@@ -162,7 +179,7 @@ git commit -m "Verify detached immutable releases"
 - Test: tests/integration/release/test_source_static_metadata.py
 
 **Interfaces:**
-- Produces: classify_compatibility(), select_candidate_runtime().
+- Produces: release-kernel classify_compatibility(), select_candidate_runtime(), and statically verified source-release metadata evidence for workspace migration without source-code execution.
 - Consumes: verified current/target releases, local-state contract, static source distribution metadata.
 
 - [ ] **Step 1: RED tests**
@@ -180,8 +197,8 @@ No semantic version ordering and no implied patch/minor compatibility.
 
 - [ ] **Step 4: Verify GREEN**
 
-Run: `uv run pytest tests/unit/release/test_compatibility.py tests/property/release/test_compatibility_graph.py tests/integration/release/test_source_static_metadata.py -q`
-Expected: all relationship dimensions match Core diagnostics.
+Run: `uv run pytest tests/unit/release/test_compatibility.py tests/property/release/test_compatibility_graph.py tests/integration/release/test_source_static_metadata.py tests/contracts/release/test_release_kernel_boundary.py -q`
+Expected: all relationship dimensions match Core diagnostics and the release kernel remains a leaf import boundary.
 
 - [ ] **Step 5: Commit**
 
@@ -189,6 +206,18 @@ Expected: all relationship dimensions match Core diagnostics.
 git add src/agent_stack/release/compatibility.py compatibility/releases.yaml tests
 git commit -m "Add directed release compatibility"
 ~~~
+
+## Release Kernel Component Gate
+
+Stop Lifecycle execution after Task 3 and run:
+
+~~~bash
+uv run pytest tests/contracts/release/test_release_api.py tests/contracts/release/test_release_kernel_boundary.py tests/property/release/test_release_identity.py tests/unit/release/test_trust_policy.py tests/integration/release/test_manifest_verification.py tests/unit/release/test_compatibility.py tests/property/release/test_compatibility_graph.py tests/integration/release/test_source_static_metadata.py -q
+uv run ruff check src/agent_stack/release tests/contracts/release tests/unit/release tests/integration/release tests/property/release
+uv run mypy src/agent_stack/release
+~~~
+
+Expected: PASS and `release-kernel component-complete`. This unlocks Renderer/Runtime component waves only. Do not run Lifecycle Task 4, claim Lifecycle completion, build release artifacts, or publish until Renderer, Runtime, and Route are integration-complete.
 
 ### Task 4: Implement CLI parser, dispatch matrix, output, and redaction
 
@@ -207,7 +236,7 @@ git commit -m "Add directed release compatibility"
 
 **Interfaces:**
 - Produces: compose_lifecycle_command(), render_cli_json(), render_cli_human().
-- Consumes: all Task 1-5 APIs/errors without redefining them.
+- Consumes: all real Core/Provider/Renderer/Runtime/Route APIs and errors without redefining them. This task starts only after the Renderer/Runtime/Route integration-complete gates.
 
 - [ ] **Step 1: RED contract tests**
 
@@ -272,91 +301,97 @@ git add src/agent_stack/cli/dispatch.py src/agent_stack/release/distribution.py 
 git commit -m "Orchestrate verified upgrades and rollback"
 ~~~
 
-### Task 6: Implement distribution render digest and artifact builds
+### Task 6: Freeze provenance, full licenses, and notices before artifact build
+
+**Files:**
+- Create: src/agent_stack/release/provenance.py
+- Create: schemas/release/provenance-lock.v1.json
+- Create: release/provenance-lock.json
+- Create: tools/release/generate_notices.py
+- Create: LICENSES/PyYAML-6.0.2.txt
+- Create: LICENSES/fastjsonschema-2.21.1.txt
+- Create: THIRD_PARTY_NOTICES.md
+- Test: tests/contracts/release/test_provenance_inventory.py
+- Test: tests/packaging/test_notices.py
+
+**Interfaces:**
+- Produces: FrozenProvenanceInventory plus complete `LICENSES/` and `THIRD_PARTY_NOTICES.md` inputs that must exist before any final distribution build.
+- Consumes: Core `vendor/runtime-vendor-lock.json` and source licenses, Provider provenance, complete first-party/runtime-visible-unit inventory, and projected artifact provenance.
+
+- [ ] **Step 1: RED provenance checks**
+
+Test every upstream, vendored, generated, and projected unit maps to exact source/version/archive hash/per-file hash/SPDX/modification/full-license records. Assert PyYAML 6.0.2 and fastjsonschema 2.21.1 source hashes, installed private namespaces, namespace-relocation modification notices, exact license bytes, no unregistered vendor file, deterministic notice ordering, and failure on missing/ambiguous provenance. Assert the frozen inventory contains no wheel/sdist/container hash that would create a build cycle.
+
+- [ ] **Step 2: Verify RED**
+
+Run: `uv run pytest tests/contracts/release/test_provenance_inventory.py tests/packaging/test_notices.py -q`
+Expected: FAIL because the provenance lock, full licenses, notices, and generator do not exist.
+
+- [ ] **Step 3: Implement deterministic provenance aggregation**
+
+Generate the closed provenance lock, full license copies, and notices from frozen Core/Provider/artifact records. Do not infer a license from a component name and do not inspect a built distribution. The generated files are inputs to Task 7, not post-build patches.
+
+- [ ] **Step 4: Verify GREEN**
+
+Run: `uv run python tools/vendor/sync_runtime_vendor.py --check && uv run pytest tests/contracts/release/test_provenance_inventory.py tests/packaging/test_notices.py -q`
+Expected: complete deterministic provenance and full-license inputs pass before any final wheel/sdist exists; a missing or changed record blocks.
+
+- [ ] **Step 5: Commit**
+
+~~~bash
+git add src/agent_stack/release/provenance.py schemas/release/provenance-lock.v1.json release/provenance-lock.json tools/release/generate_notices.py LICENSES THIRD_PARTY_NOTICES.md tests/contracts/release/test_provenance_inventory.py tests/packaging/test_notices.py
+git commit -m "Freeze release provenance and license inputs"
+~~~
+
+### Task 7: Build final distributions, compute render digest, and run release gates
 
 **Files:**
 - Modify: pyproject.toml
+- Create: src/agent_stack/release/gates.py
 - Create: tools/release/build_artifacts.py
 - Create: tools/release/compute_render_digest.py
 - Test: tests/packaging/test_self_contained_wheel.py
 - Test: tests/packaging/test_package_data.py
 - Test: tests/packaging/test_distribution_render_digest.py
 - Test: tests/packaging/test_python_matrix_contract.py
+- Test: tests/packaging/test_provenance.py
+- Test: tests/packaging/test_vendor_payload.py
+- Test: tests/integration/release/test_release_gates.py
 
 **Interfaces:**
-- Produces: build_release_artifacts(), compute_distribution_render_digest().
-- Consumes: all package data, render projections, verified detached-manifest substitutions.
+- Produces: build_release_artifacts(), compute_distribution_render_digest(), run_release_gates(), and the final gated wheel/sdist byte set consumed by publication.
+- Consumes: all package/render data plus Task 6's frozen provenance inventory, `LICENSES/`, notices, Core vendor lock, and verified detached-manifest substitutions. No later task may mutate distribution contents.
 
-- [ ] **Step 1: RED artifact checks**
+- [ ] **Step 1: RED final-artifact checks**
 
-Before generator code, write checks for empty wheel Requires-Dist, all package data, manifest absent from distributions, wheel/sdist/Git logical inventory parity, scoped digest exclusions, same digest across forms/repeated roots, Python 3.11-3.14 metadata.
+Before build code, test empty wheel Requires-Dist, all package data, full licenses/notices/provenance present, detached manifest absent, wheel/sdist/Git logical inventory parity, scoped digest exclusions, repeated-root render equality, Python 3.11-3.14 metadata, and all 13 release gates. Extract wheel and sdist and assert every `agent_stack._vendor` path and byte hash exactly equals `vendor/runtime-vendor-lock.json`, with no unregistered file or top-level public vendor package.
 
 - [ ] **Step 2: Verify RED**
 
-Run: uv run pytest tests/packaging -q
-Expected: FAIL because build scripts/package data are incomplete.
+Run: `uv run pytest tests/packaging/test_self_contained_wheel.py tests/packaging/test_package_data.py tests/packaging/test_distribution_render_digest.py tests/packaging/test_python_matrix_contract.py tests/packaging/test_provenance.py tests/packaging/test_vendor_payload.py tests/integration/release/test_release_gates.py -q`
+Expected: FAIL because final build/digest/gate code and final artifacts do not exist.
 
-- [ ] **Step 3: Implement build and digest tools**
+- [ ] **Step 3: Implement final build, digest, and gate tools**
 
-Fix bundle roots before build; compute distribution hashes/sizes only after artifacts are final. Do not create detached manifest inside source distributions.
+Fix bundle/provenance/license roots before build, build wheel/sdist once from those committed inputs, compute distribution hashes/sizes only after final bytes exist, and write `dist/release-artifact-set.json` with the exact paths, sizes, and hashes. Run gates against that exact artifact set. Do not create the detached manifest inside source distributions and do not regenerate notices or licenses after build.
 
 - [ ] **Step 4: Verify GREEN**
 
 Run:
 
 ~~~bash
+uv run python tools/vendor/sync_runtime_vendor.py --check
 uv build
-uv run pytest tests/packaging -q
+uv run pytest tests/packaging/test_self_contained_wheel.py tests/packaging/test_package_data.py tests/packaging/test_distribution_render_digest.py tests/packaging/test_python_matrix_contract.py tests/packaging/test_provenance.py tests/packaging/test_vendor_payload.py tests/integration/release/test_release_gates.py -q
 ~~~
 
-Expected: wheel/sdist pass and render digests match.
+Expected: final wheel/sdist contain the frozen licenses, notices, provenance, and exact vendor bytes; render digests match and all release gates pass on those same bytes.
 
 - [ ] **Step 5: Commit**
 
 ~~~bash
-git add pyproject.toml tools/release tests/packaging
-git commit -m "Build reproducible self-contained distributions"
-~~~
-
-### Task 7: Implement provenance, notices, and release gates
-
-**Files:**
-- Create: src/agent_stack/release/provenance.py
-- Create: src/agent_stack/release/gates.py
-- Create: tools/release/generate_notices.py
-- Create: LICENSES/
-- Create: THIRD_PARTY_NOTICES.md
-- Test: tests/packaging/test_provenance.py
-- Test: tests/packaging/test_notices.py
-- Test: tests/integration/release/test_release_gates.py
-
-**Interfaces:**
-- Produces: run_release_gates() and complete license/provenance artifacts.
-- Consumes: Provider provenance and full artifact/unit inventory.
-
-- [ ] **Step 1: RED tests**
-
-Test every upstream/vendored/projected artifact maps to source/version/hash/SPDX/modified/full license; exact pinned license revalidation; target notices; missing/ambiguous provenance gate; all 13 release gates.
-
-- [ ] **Step 2: Verify RED**
-
-Run: `uv run pytest tests/packaging/test_provenance.py tests/packaging/test_notices.py tests/integration/release/test_release_gates.py -q`
-Expected: FAIL on missing modules or assets.
-
-- [ ] **Step 3: Implement deterministic provenance aggregation**
-
-Generate notices from locked records. Do not infer license solely from component name.
-
-- [ ] **Step 4: Verify GREEN**
-
-Run: `uv run pytest tests/packaging/test_provenance.py tests/packaging/test_notices.py tests/integration/release/test_release_gates.py -q`
-Expected: complete SPDX and full texts; a missing record blocks.
-
-- [ ] **Step 5: Commit**
-
-~~~bash
-git add src/agent_stack/release/provenance.py src/agent_stack/release/gates.py tools/release/generate_notices.py LICENSES THIRD_PARTY_NOTICES.md tests
-git commit -m "Enforce release provenance and notices"
+git add pyproject.toml src/agent_stack/release/gates.py tools/release tests/packaging tests/integration/release/test_release_gates.py
+git commit -m "Build and gate final release distributions"
 ~~~
 
 ### Task 8: Implement CI matrices and immutable publication workflow
@@ -371,11 +406,11 @@ git commit -m "Enforce release provenance and notices"
 
 **Interfaces:**
 - Produces: build->verify->manifest->publish->immutable->reverify pipeline.
-- Consumes: build artifacts and release gates.
+- Consumes: Task 7's gated `dist/release-artifact-set.json` and exact final artifact bytes; publication may not rebuild or mutate them.
 
 - [ ] **Step 1: RED workflow tests**
 
-Parse workflows and assert Python 3.11-3.14, artifact-based tests, no manifest-before-build, immutable release verification, exact asset re-fetch/hash, no asset replacement, and required gate dependencies.
+Parse workflows and assert Python 3.11-3.14, provenance/licenses/notices frozen before build, artifact-based tests, release gates against the exact final artifact set before detached-manifest generation, no manifest-before-build, immutable release verification, exact asset re-fetch/hash, no asset replacement, and required gate dependencies.
 
 - [ ] **Step 2: Verify RED**
 
@@ -384,7 +419,7 @@ Expected: FAIL because workflows or scripts are absent.
 
 - [ ] **Step 3: Implement deterministic workflow**
 
-Use immutable version/tag inputs only. Generate release-manifest.json after final wheel/sdist, publish once, require immutable status, re-download and verify.
+Use immutable version/tag inputs only. Consume Task 7's already gated final wheel/sdist without rebuilding or modifying them, generate release-manifest.json afterward, publish once, require immutable status, re-download, and verify.
 
 - [ ] **Step 4: Verify GREEN**
 
@@ -434,10 +469,10 @@ Run:
 uv run pytest tests/unit tests/contracts tests/property tests/golden tests/integration tests/concurrency tests/packaging tests/e2e -q
 uv run ruff check src tests tools
 uv run mypy src
-uv build
+uv run python tools/release/build_artifacts.py --verify-existing dist/release-artifact-set.json
 ~~~
 
-Expected: all pass on every supported Python job; acceptance matrix reports 64/64.
+Expected: all pass on every supported Python job; acceptance matrix reports 64/64 and the final artifact-set hashes still match the Task 7 bytes without rebuilding.
 
 - [ ] **Step 5: Commit**
 
@@ -448,10 +483,10 @@ git commit -m "Close release acceptance matrix"
 
 ## Global Validation
 
-Run the complete suite from clean wheel, sdist, and Git checkout environments. Run release gates twice. Inspect built wheel metadata for empty Requires-Dist and absence of release-manifest.json. Verify published-release workflow with a disposable immutable test repository before production release.
+Run the release-kernel gate after Task 3, then stop until Renderer/Runtime/Route are integration-complete. After Task 9, run the complete suite from clean final wheel, sdist, and Git checkout environments. Verify vendor-lock bytes, full licenses/notices/provenance, empty Requires-Dist, and absence of release-manifest.json inside distributions. Run release gates twice against the same artifact hashes and verify the publication workflow with a disposable immutable test repository before production release.
 
 ## Implementation Constraint Prompt
 
 ~~~text
-Read the approved Lifecycle/Release spec and this plan. Stop on conflicts with any frozen Task 1-5 interface. Use strict TDD for behavior and prewritten deterministic checks for generated release artifacts. Keep CLI composition thin; never redefine domain semantics/errors. Build wheel/sdist before generating the detached manifest, keep runtime Requires-Dist empty, support Python 3.11-3.14, use exact directed compatibility, and verify immutable GitHub release assets after publication. Run the complete AC-01–AC-64 suite before completion.
+Read the approved Lifecycle/Release spec and this plan. Execute Tasks 1-3 after Core/Providers, stop at release-kernel component-complete, and do not begin Tasks 4-9 until Renderer/Runtime/Route are integration-complete. Use strict TDD for behavior and prewritten deterministic checks for generated release artifacts. Keep CLI composition thin and never redefine domain semantics/errors. Freeze provenance/full licenses/notices before building final wheel/sdist; gate those exact final bytes before detached-manifest generation, keep runtime Requires-Dist empty, support Python 3.11-3.14, use exact directed compatibility, and verify immutable GitHub release assets after publication. Run the complete AC-01–AC-64 suite before completion.
 ~~~
