@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.provider-execution-result",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "provider_plan_digest", "approval_digest", "attempt_id", "terminal_state", "containment_evidence_digest", "result_category", "candidate_output_root_digest", "diagnostics_digest", "provenance_records"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.provider-execution-result"},
+    "schema_version": {"const": 1},
+    "provider_plan_digest": {"$ref": "#/definitions/sha256"},
+    "approval_digest": {"oneOf": [{"$ref": "#/definitions/sha256"}, {"const": "canonical-null"}]},
+    "attempt_id": {"type": "string", "pattern": "^[0-9a-f-]{36}$"},
+    "terminal_state": {"enum": ["succeeded", "failed", "interrupted"]},
+    "containment_evidence_digest": {"$ref": "#/definitions/sha256"},
+    "result_category": {"type": "string", "minLength": 1},
+    "candidate_output_root_digest": {"$ref": "#/definitions/sha256"},
+    "diagnostics_digest": {"$ref": "#/definitions/sha256"},
+    "provenance_records": {"type": "array", "items": {"type": "object"}}
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.provider-failure",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "code", "exit_code", "message", "details"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.provider-failure"},
+    "schema_version": {"const": 1},
+    "code": {"enum": ["AWP_PROVIDER_PLAN_INVALID", "AWP_PROVIDER_APPROVAL_REQUIRED", "AWP_PROVIDER_APPROVAL_INVALID", "AWP_PROVIDER_DOWNLOAD_LIMIT", "AWP_PROVIDER_HASH_MISMATCH", "AWP_PROVIDER_ARCHIVE_UNSAFE", "AWP_PROVIDER_CACHE_CORRUPT", "AWP_PROVIDER_ATTEMPT_CORRUPT", "AWP_PROVIDER_CONTAINMENT_AMBIGUOUS", "AWP_INITIALIZER_NONDETERMINISTIC", "AWP_PROVENANCE_INCOMPLETE"]},
+    "exit_code": {"enum": [2, 23, 30, 31]},
+    "message": {"type": "string", "minLength": 1},
+    "details": {"type": "object"}
+  }
+}

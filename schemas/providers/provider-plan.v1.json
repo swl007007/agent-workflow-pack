@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.provider-plan",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": ["agent-workflow.provider-plan.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "provider_id", "provider_version", "provider_artifact_digest", "command_digest", "command", "project_id", "workspace_instance_id", "workflow_lock_digest", "input_digests", "requested_controls", "measured_isolation_gaps", "approval_challenge", "prospective_transaction_id", "deterministic_output_contract"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.provider-plan"},
+    "schema_version": {"const": 1},
+    "provider_id": {"type": "string", "minLength": 1},
+    "provider_version": {"type": "string", "minLength": 1},
+    "provider_artifact_digest": {"$ref": "#/definitions/sha256"},
+    "command_digest": {"$ref": "#/definitions/sha256"},
+    "command": {
+      "type": "object", "additionalProperties": false,
+      "required": ["executable_id", "arguments"],
+      "properties": {"executable_id": {"type": "string", "minLength": 1}, "arguments": {"type": "array", "items": {"type": "string"}}}
+    },
+    "project_id": {"$ref": "#/definitions/uuid"},
+    "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+    "workflow_lock_digest": {"$ref": "#/definitions/sha256"},
+    "input_digests": {"type": "array", "items": {"$ref": "#/definitions/sha256"}},
+    "requested_controls": {"type": "object", "additionalProperties": {"enum": ["required", "approval-required", "best-effort"]}},
+    "measured_isolation_gaps": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "approval_challenge": {"$ref": "#/definitions/sha256"},
+    "prospective_transaction_id": {"$ref": "#/definitions/uuid"},
+    "deterministic_output_contract": {"type": "object"}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}
