@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.release-manifest",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-6",
+  "x-implementation-owner": "task-6",
+  "x-digest-domains": ["agent-workflow.release-manifest.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "release_id", "version", "repository", "source_commit", "bundles", "assets"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.release-manifest"},
+    "schema_version": {"const": 1},
+    "release_id": {"$ref": "#/definitions/sha256"},
+    "version": {"type": "string", "minLength": 1},
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "owner", "name", "tag", "immutable_release_required"],
+      "properties": {
+        "host": {"type": "string", "minLength": 1},
+        "owner": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "tag": {"type": "string", "minLength": 1},
+        "immutable_release_required": {"const": true}
+      }
+    },
+    "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "bundles": {"$ref": "#/definitions/bundles"},
+    "assets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wheel", "sdist"],
+      "properties": {
+        "wheel": {"$ref": "#/definitions/asset"},
+        "sdist": {"$ref": "#/definitions/asset"}
+      }
+    }
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "bundles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trust_policy", "workflow_lock", "artifact", "schema", "migration", "compatibility", "launcher"],
+      "properties": {
+        "trust_policy": {"$ref": "#/definitions/sha256"},
+        "workflow_lock": {"$ref": "#/definitions/sha256"},
+        "artifact": {"$ref": "#/definitions/sha256"},
+        "schema": {"$ref": "#/definitions/sha256"},
+        "migration": {"$ref": "#/definitions/sha256"},
+        "compatibility": {"$ref": "#/definitions/sha256"},
+        "launcher": {"$ref": "#/definitions/sha256"}
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "url", "size", "sha256"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "url": {"type": "string", "pattern": "^https://"},
+        "size": {"type": "integer", "minimum": 1},
+        "sha256": {"$ref": "#/definitions/sha256"}
+      }
+    }
+  }
+}

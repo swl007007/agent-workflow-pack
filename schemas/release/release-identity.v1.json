@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.release-identity",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-6",
+  "x-implementation-owner": "task-6",
+  "x-digest-domains": ["agent-workflow.release-identity.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "repository_id", "distribution_name", "version", "release_id"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.release-identity"},
+    "schema_version": {"const": 1},
+    "repository_id": {"type": "string", "pattern": "^[a-z0-9.-]+/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+    "distribution_name": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "minLength": 1},
+    "release_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

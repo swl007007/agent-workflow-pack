@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.release-gate-result",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-6",
+  "x-implementation-owner": "task-6",
+  "x-digest-domains": ["agent-workflow.release-gate.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "status", "artifact_set_digest", "gates"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.release-gate-result"},
+    "schema_version": {"const": 1},
+    "status": {"enum": ["passed", "failed"]},
+    "artifact_set_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "gates": {"type": "array", "items": {"type": "object"}}
+  }
+}

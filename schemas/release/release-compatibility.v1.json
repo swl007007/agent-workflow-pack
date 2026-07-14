@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.release-compatibility",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-6",
+  "x-implementation-owner": "task-6",
+  "x-digest-domains": ["agent-workflow.release-compatibility.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "release_id", "edges"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.release-compatibility"},
+    "schema_version": {"const": 1},
+    "release_id": {"$ref": "#/definitions/sha256"},
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_release_id", "to_release_id", "from_version", "to_version", "trust_policy_digest", "target_bundles", "schema_transitions", "local_state_contracts", "trellis_task_layouts", "migration_ids"],
+        "properties": {
+          "from_release_id": {"$ref": "#/definitions/sha256"},
+          "to_release_id": {"$ref": "#/definitions/sha256"},
+          "from_version": {"type": "string", "minLength": 1},
+          "to_version": {"type": "string", "minLength": 1},
+          "trust_policy_digest": {"$ref": "#/definitions/sha256"},
+          "target_bundles": {"type": "object"},
+          "schema_transitions": {"type": "object"},
+          "local_state_contracts": {"type": "object"},
+          "trellis_task_layouts": {"type": "object"},
+          "migration_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+        }
+      }
+    }
+  },
+  "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}
+}
