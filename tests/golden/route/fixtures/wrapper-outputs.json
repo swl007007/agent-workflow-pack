@@ -1,0 +1,19 @@
+{
+  "native_light": {
+    "entry_id": "sol-native",
+    "fields": [
+      "decision_digest",
+      "entry_id",
+      "intent_digest",
+      "operation",
+      "platform",
+      "repository_launcher",
+      "schema_id",
+      "schema_version"
+    ],
+    "launcher_suffix": ".agent-workflow/bin/agent-stack",
+    "operation": "execute-light",
+    "platform": "codex",
+    "schema_id": "agent-workflow.native-light-dispatch"
+  }
+}

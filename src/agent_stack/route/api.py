@@ -56,3 +56,7 @@ def invoke_execute_light(decision: object, runtime_context: object) -> object:
 
 def invoke_integrated_wrapper(invocation: object) -> object:
     return _implementation(".wrappers", "invoke_integrated_wrapper")(invocation)
+
+
+def production_route_verifier_ports() -> object:
+    return _implementation(".wrappers", "production_route_verifier_ports")()
