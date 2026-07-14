@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import shutil
 import json
+import subprocess
 from types import MappingProxyType
 
 from agent_stack.cli.parser import CommandInvocation
@@ -12,6 +13,7 @@ from agent_stack.release import commands as release_commands
 from agent_stack.reconcile.production_bundle import load_production_bundle
 from agent_stack.release.identity import ReleaseIdentity
 from agent_stack.release.manifest import VerifiedRelease
+from agent_stack.runtime import commands as runtime_commands
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -57,6 +59,39 @@ def _command(
             debug=False,
         ),
         repository_root=root,
+    )
+
+
+def _launcher_command(root: Path, caller_root: Path) -> ProductionCommand:
+    home = caller_root / "home"
+    config = home / ".codex"
+    harness = home / "bin/codex"
+    config.mkdir(parents=True)
+    harness.parent.mkdir(parents=True)
+    harness.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    harness.chmod(0o755)
+    return ProductionCommand(
+        invocation=CommandInvocation(
+            command="workspace-register",
+            options=MappingProxyType({}),
+            json_output=True,
+            debug=False,
+        ),
+        repository_root=root,
+        caller_context_version=1,
+        caller_fields=MappingProxyType(
+            {
+                "platform": "codex",
+                "user_home": str(home),
+                "config_root.codex_home": str(config),
+                "harness_executable": str(harness),
+                "harness_version_probe_id": "codex-version-v1",
+                "tty": (
+                    "stdin=false,stdout=false,stderr=false,"
+                    "direct_confirmation_capable=false"
+                ),
+            }
+        ),
     )
 
 
@@ -173,3 +208,47 @@ def test_init_apply_uses_real_bundle_and_commits_complete_project_contract(
         for path in project.rglob("*")
         if path.is_file()
     } == before
+
+
+def test_production_workspace_register_recreates_clone_local_contract(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+
+    commands.run_init(_command(project, dry_run=False))
+    local = project / ".agent-workflow/local"
+    shutil.rmtree(local)
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+
+    result = runtime_commands.run_workspace_register(
+        _launcher_command(project, tmp_path / "caller")
+    )
+
+    assert result["committed"] is True
+    assert (local / "workspace.json").is_file()
+    assert (local / "approval-replay.json").is_file()
