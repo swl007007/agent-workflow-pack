@@ -94,6 +94,7 @@ def run_recover(payload: object) -> object:
         recover_workspace_migration,
         recover_workspace_registration,
     )
+    from agent_stack.reconcile.recovery import recover_transaction
 
     command = cast(ProductionCommand, payload)
     kind = command.invocation.options.get("journal_kind")
@@ -104,6 +105,33 @@ def run_recover(payload: object) -> object:
             "AWP_RECONCILE_RECOVERY_REQUIRED", "recovery selection is invalid"
         )
     _verified_project(command)
+    if kind == "lifecycle":
+        bundle = load_production_bundle(_data_root())
+        lifecycle_result = recover_transaction(
+            transaction_id,
+            action,
+            root=command.repository_root,
+            scanner=NormativeTaskScanner(command.repository_root),
+            scanner_context={
+                "bootstrap_lock_root": str(
+                    command.repository_root.parent / ".awp-bootstrap-locks"
+                ),
+                "source_layout": bundle.trellis_layout,
+                "target_layout": bundle.trellis_layout,
+                "source_schemas": bundle.discovery_schemas,
+                "target_schemas": bundle.discovery_schemas,
+            },
+        )
+        return MappingProxyType(
+            {
+                "schema_id": "agent-workflow.recovery-result",
+                "schema_version": 1,
+                "journal_kind": kind,
+                "transaction_id": transaction_id,
+                "committed": lifecycle_result.get("committed") is True,
+                "rolled_back": lifecycle_result.get("rolled_back") is True,
+            }
+        )
     if kind == "workspace-registration":
         result = recover_workspace_registration(
             command.repository_root,

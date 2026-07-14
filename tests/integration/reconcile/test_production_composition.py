@@ -272,6 +272,77 @@ def test_production_workspace_register_recreates_clone_local_contract(
     assert (local / "approval-replay.json").is_file()
 
 
+def test_production_lifecycle_recover_resumes_exact_committed_journal(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import agent_stack.reconcile.apply as apply_module
+
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+
+    def crash(point: str) -> None:
+        if point == "after_manifest":
+            raise RuntimeError("simulated lifecycle crash")
+
+    monkeypatch.setattr(apply_module, "_crash_at", crash)
+    with pytest.raises(RuntimeError, match="simulated lifecycle crash"):
+        commands.run_init(_command(project, dry_run=False))
+    monkeypatch.setattr(apply_module, "_crash_at", lambda point: None)
+
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    transaction_id = str(manifest["last_transaction_id"])
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+
+    result = commands.run_recover(
+        _launcher_command(
+            project,
+            tmp_path / "caller-lifecycle-recover",
+            command="recover",
+            options=MappingProxyType(
+                {
+                    "journal_kind": "lifecycle",
+                    "journal_id": transaction_id,
+                    "recovery_action": "resume",
+                }
+            ),
+        )
+    )
+
+    assert result["journal_kind"] == "lifecycle"
+    assert result["transaction_id"] == transaction_id
+    assert result["committed"] is True
+    journal = json.loads(
+        (
+            project
+            / ".agent-workflow/transactions"
+            / f"{transaction_id}.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert journal["phase"] == "complete"
+
+
 def test_production_task_claim_loads_real_integration_and_calls_domain_service(
     tmp_path: Path, monkeypatch
 ) -> None:

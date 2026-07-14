@@ -27,6 +27,7 @@
 - Production `recover --workspace-migration` reconstructs the exact recorded layout/schema scanner context and resumes the real migration journal; a crash after local candidates is covered.
 - Release publication now computes workflow-lock and artifact-bundle roots through the exact Core Resolver projections, closing a cross-layer authority mismatch that would have made a published init fail later runtime verification.
 - Installed-console expectations now distinguish release-independent `test-routing` from unpublished release-dependent `doctor`/`sync`, which correctly fail at `AWP_RELEASE_MANIFEST_INVALID` with zero writes.
+- Production `recover --transaction` now loads the exact lifecycle journal, verifies project/caller authority, reconstructs the packaged scanner contract, and resumes committed cleanup through the real Reconciler recovery path.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Focused release-authority and console verification: 9 tests passed; Ruff and mypy passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
@@ -45,4 +46,4 @@
 
 ## Resume
 
-Bind lifecycle recovery/upgrade using exact release journals, then add the deterministic immutable-network installed-wheel console chain.
+Bind standalone probe recovery and upgrade using exact recorded/verified release inputs, then add the deterministic immutable-network installed-wheel console chain.
