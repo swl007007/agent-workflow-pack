@@ -14,6 +14,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Mapping
 from pathlib import Path
+from types import MappingProxyType
 from typing import Protocol, cast
 
 from agent_stack._vendor import yaml
@@ -21,6 +22,9 @@ from agent_stack.core.api import canonical_json_bytes, digest
 from agent_stack.release.errors import LifecycleFailure
 from agent_stack.release.gates import run_release_gates, verify_release_artifact_set
 from agent_stack.release.identity import release_id
+from agent_stack.release.identity import ReleaseIdentity
+from agent_stack.release.first_install import render_release_body
+from agent_stack.release.manifest import VerifiedRelease
 
 if __package__:
     from .verify_published_release import verify_published_release
@@ -32,7 +36,7 @@ else:
 class PublicationClient(Protocol):
     def immutable_releases_enabled(self) -> bool: ...
 
-    def create_release_once(self, tag: str, source_commit: str) -> str: ...
+    def create_release_once(self, tag: str, source_commit: str, body: str) -> str: ...
 
     def upload_asset_once(self, release_id: str, path: Path) -> None: ...
 
@@ -211,6 +215,27 @@ def _assert_final_bytes(artifact_set_path: Path) -> None:
     verify_release_artifact_set(artifact_set_path)
 
 
+def _candidate_release(manifest_path: Path) -> VerifiedRelease:
+    document = json.loads(manifest_path.read_text(encoding="utf-8"))
+    version = str(document["version"])
+    assets = cast(Mapping[str, Mapping[str, object]], document["assets"])
+    return VerifiedRelease(
+        identity=ReleaseIdentity(
+            "github.com/swl007007/agent-workflow-pack", "agent-workflow-pack", version
+        ),
+        manifest_digest=_hash(manifest_path),
+        source_commit=str(document["source_commit"]),
+        bundles=MappingProxyType(dict(cast(Mapping[str, str], document["bundles"]))),
+        assets=MappingProxyType(
+            {
+                kind: MappingProxyType(dict(value))
+                for kind, value in assets.items()
+            }
+        ),
+        immutable_release=True,
+    )
+
+
 def publish_immutable_release(
     *,
     artifact_set_path: Path,
@@ -227,8 +252,10 @@ def publish_immutable_release(
         version=version,
         source_commit=source_commit,
     )
+    candidate_release = _candidate_release(manifest)
+    body = render_release_body(candidate_release, candidate_release.manifest_digest)
     tag = f"v{version}"
-    release_id = client.create_release_once(tag, source_commit)
+    release_id = client.create_release_once(tag, source_commit, body)
     try:
         _assert_final_bytes(artifact_set_path)
     except LifecycleFailure as error:
@@ -244,6 +271,7 @@ def publish_immutable_release(
         tag=tag,
         source_commit=source_commit,
         local_assets={path.name: path for path in assets},
+        expected_body=body,
     )
 
 
@@ -284,7 +312,7 @@ class GitHubAPIClient:
             return data
         return json.loads(data) if data else {}
 
-    def create_release_once(self, tag: str, source_commit: str) -> str:
+    def create_release_once(self, tag: str, source_commit: str, body: str) -> str:
         payload = self._request(
             "POST",
             f"{self.api}/releases",
@@ -294,6 +322,7 @@ class GitHubAPIClient:
                 "name": tag,
                 "draft": True,
                 "prerelease": False,
+                "body": body,
             },
         )
         if not isinstance(payload, Mapping) or not isinstance(payload.get("id"), int):

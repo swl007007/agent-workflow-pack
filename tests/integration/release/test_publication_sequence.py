@@ -20,6 +20,7 @@ class FakeGitHub:
         self.assets: dict[str, bytes] = {}
         self.source_commit = ""
         self.tag = ""
+        self.body = ""
         self.immutable = False
         self.mutate_after_create = mutate_after_create
 
@@ -27,10 +28,11 @@ class FakeGitHub:
         self.events.append("check-immutable-policy")
         return True
 
-    def create_release_once(self, tag: str, source_commit: str) -> str:
+    def create_release_once(self, tag: str, source_commit: str, body: str) -> str:
         self.events.append("create-release")
         self.tag = tag
         self.source_commit = source_commit
+        self.body = body
         if self.mutate_after_create is not None:
             self.mutate_after_create.write_bytes(b"mutated")
         return "release-1"
@@ -59,6 +61,7 @@ class FakeGitHub:
             "tag_name": self.tag,
             "target_commitish": self.source_commit,
             "immutable": self.immutable,
+            "body": self.body,
             "assets": [
                 {
                     "name": name,
@@ -76,7 +79,10 @@ class FakeGitHub:
         return self.assets[name]
 
 
-def test_publication_sequence_uses_final_bytes_once_then_re_fetches_every_asset() -> None:
+def test_publication_sequence_uses_final_bytes_once_then_re_fetches_every_asset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("tools.release.publish_release.run_release_gates", lambda _value: [])
     artifact_set = build_release_artifacts(ROOT, ROOT / "dist", rebuild=False)
     client = FakeGitHub()
 
@@ -96,12 +102,14 @@ def test_publication_sequence_uses_final_bytes_once_then_re_fetches_every_asset(
     ]
     assert "upload:release-manifest.json" in client.events
     assert "publish-release" in client.events
+    assert "Canonical first-install command" in client.body
     assert client.events.index("publish-release") < client.events.index("resolve-tag")
     assert client.events.count("create-release") == 1
     assert sorted(name for name in client.assets) == sorted(
         [artifact_set.wheel.path.name, artifact_set.sdist.path.name, "release-manifest.json"]
     )
     assert sum(event.startswith("download:") for event in client.events) == 3
+    assert result["canonical_first_install_command_digest"]
 
 
 def test_publication_fails_if_final_artifact_changes_after_release_creation() -> None:
@@ -139,6 +147,7 @@ def test_published_verifier_rejects_non_immutable_or_replaced_assets() -> None:
             tag="v0.1.0",
             source_commit="c" * 40,
             local_assets={path.name: path for path in (artifact_set.wheel.path, artifact_set.sdist.path, manifest)},
+            expected_body="expected",
         )
 
 
@@ -167,6 +176,7 @@ def test_published_verifier_uses_resolved_remote_tag_commit() -> None:
     client.tag = "v0.1.0"
     client.source_commit = "c" * 40
     client.immutable = True
+    client.body = "```sh\ncommand\n```"
     for path in (artifact_set.wheel.path, artifact_set.sdist.path, manifest):
         client.assets[path.name] = path.read_bytes()
 
@@ -178,7 +188,26 @@ def test_published_verifier_uses_resolved_remote_tag_commit() -> None:
             path.name: path
             for path in (artifact_set.wheel.path, artifact_set.sdist.path, manifest)
         },
+        expected_body=client.body,
     )
 
     assert result["status"] == "verified"
     assert "resolve-tag" in client.events
+
+
+@pytest.mark.parametrize("body", ["", "truncated", "```sh\nchanged\n```"])
+def test_published_verifier_rejects_missing_or_changed_body(body: str) -> None:
+    client = FakeGitHub()
+    client.tag = "v0.1.5"
+    client.source_commit = "c" * 40
+    client.immutable = True
+    client.body = body
+
+    with pytest.raises(LifecycleFailure, match="release body differs"):
+        verify_published_release(
+            client=client,
+            tag=client.tag,
+            source_commit=client.source_commit,
+            local_assets={},
+            expected_body="```sh\nexpected\n```",
+        )

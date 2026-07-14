@@ -54,6 +54,7 @@ _GATE_IDS: Final = (
     "platform-adapter-contracts",
     "complete-suite-contract",
     "immutable-publication-ready",
+    "canonical-first-install-publication",
     "license-provenance-notices",
 )
 
@@ -503,6 +504,8 @@ def run_release_gates(artifact_set: ReleaseArtifactSet) -> dict[str, object]:
         raise _failure("platform projected-unit catalog is incomplete")
     if "agent_stack/data/runtime-launcher/agent-stack.sh.tmpl" not in artifact_set.wheel_names:
         raise _failure("launcher bootstrap template is missing from wheel")
+    if "agent_stack/release/first_install.py" not in artifact_set.git_inventory:
+        raise _failure("canonical first-install renderer is missing from distributions")
     evidence = {
         "wheel_sha256": artifact_set.wheel.sha256,
         "sdist_sha256": artifact_set.sdist.sha256,
@@ -522,6 +525,13 @@ def run_release_gates(artifact_set: ReleaseArtifactSet) -> dict[str, object]:
         _gate("platform-adapter-contracts", {"projected_units": 9}),
         _gate("complete-suite-contract", {"phase": "prepublication"}),
         _gate("immutable-publication-ready", evidence),
+        _gate(
+            "canonical-first-install-publication",
+            {
+                "renderer": "agent_stack.release.first_install",
+                "packaged": "agent_stack/release/first_install.py" in artifact_set.git_inventory,
+            },
+        ),
         _gate("license-provenance-notices", provenance.provenance_lock_digest),
     ]
     if tuple(str(gate["gate_id"]) for gate in gates) != _GATE_IDS:

@@ -115,3 +115,11 @@ def test_release_workflow_orders_build_gate_manifest_publish_and_reverify() -> N
     )
     assert verify_index < publish_index < reverify_index
     assert "immutable" in repr(publish).casefold()
+    for job in (build, publish):
+        checkout = next(step for step in job["steps"] if step.get("uses") == "actions/checkout@v4")
+        assert checkout["with"] == {
+            "ref": "refs/tags/v${{ inputs.version }}",
+            "fetch-depth": 0,
+            "fetch-tags": True,
+        }
+        assert any("rev-parse" in command and "status --porcelain" in command for command in step_runs(job))

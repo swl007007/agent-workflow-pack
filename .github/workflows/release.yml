@@ -16,6 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Verify exact clean release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "v${VERSION}^{commit}")"
+          test -z "$(git status --porcelain --untracked-files=all)"
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.28"
@@ -44,6 +54,16 @@ jobs:
     environment: immutable-release
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/v${{ inputs.version }}
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Verify exact clean release tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "v${VERSION}^{commit}")"
+          test -z "$(git status --porcelain --untracked-files=all)"
       - uses: astral-sh/setup-uv@v6
         with:
           version: "0.11.28"
