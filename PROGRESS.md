@@ -24,6 +24,7 @@
 - Public `task admit` now establishes project/caller authority and fails specifically at the absent platform-authenticated Decision/proof boundary instead of a fixed Runtime placeholder; it does not manufacture approval.
 - Production `workspace migrate` now reconstructs source identity/contract/layout from canonical clone-local state, verifies an exact target-owned compatibility edge, scans source/target task state, and calls the real migration transaction.
 - Production `recover --workspace-registration` now selects one exact journal and invokes the real registration recovery transaction after project/caller authority verification.
+- Production `recover --workspace-migration` reconstructs the exact recorded layout/schema scanner context and resumes the real migration journal; a crash after local candidates is covered.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
@@ -41,4 +42,4 @@
 
 ## Resume
 
-Bind explicit workspace-migration and lifecycle recovery using their exact journals, then close lifecycle upgrade and the installed-wheel console chain.
+Bind lifecycle recovery/upgrade using exact release journals, then add the deterministic immutable-network installed-wheel console chain. Existing unpublished doctor/sync expectations need correction because release-dependent commands correctly fail at the supply-chain gate.

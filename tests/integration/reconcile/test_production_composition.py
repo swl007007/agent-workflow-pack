@@ -635,6 +635,8 @@ def test_public_task_admit_fails_at_missing_platform_approval_not_placeholder(
 def test_production_workspace_migrate_uses_exact_target_owned_edge(
     tmp_path: Path, monkeypatch
 ) -> None:
+    import agent_stack.runtime.workspace as workspace_module
+
     data_root = _installed_data_tree(tmp_path)
     project = tmp_path / "project"
     project.mkdir()
@@ -743,11 +745,38 @@ def test_production_workspace_migrate_uses_exact_target_owned_edge(
     monkeypatch.setattr(runtime_commands, "_authorize_running_release", lambda: target)
     monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
 
-    result = runtime_commands.run_workspace_migrate(
+    def crash(point: str) -> None:
+        if point == "local_candidates_applied":
+            raise RuntimeError("migration crash")
+
+    monkeypatch.setattr(workspace_module, "_crash_at", crash)
+    with pytest.raises(RuntimeError, match="migration crash"):
+        runtime_commands.run_workspace_migrate(
+            _launcher_command(
+                project,
+                tmp_path / "caller-migrate",
+                command="workspace-migrate",
+            )
+        )
+    monkeypatch.setattr(workspace_module, "_crash_at", lambda point: None)
+    journal = next(
+        (project / ".agent-workflow/local/workspace-transactions").glob("*.json")
+    )
+    monkeypatch.setattr(commands, "_authorize_running_release", lambda: target)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+
+    result = commands.run_recover(
         _launcher_command(
             project,
-            tmp_path / "caller-migrate",
-            command="workspace-migrate",
+            tmp_path / "caller-migrate-recover",
+            command="recover",
+            options=MappingProxyType(
+                {
+                    "journal_kind": "workspace-migration",
+                    "journal_id": journal.stem,
+                    "recovery_action": "resume",
+                }
+            ),
         )
     )
 
