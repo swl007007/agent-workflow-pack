@@ -1,6 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "agent-workflow.runtime-vendor-lock",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": [],
   "title": "Agent Workflow Pack runtime vendor lock",
   "type": "object",
   "additionalProperties": false,
