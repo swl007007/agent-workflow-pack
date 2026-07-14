@@ -1,6 +1,7 @@
 # Agent Workflow Pack Core Schemas and Resolver Design
 
-**Status:** Review requested — feature spec not approved
+**Status:** Approved
+**Approval:** Explicit user approval on 2026-07-13
 **Umbrella spec:** 2026-07-13-agent-workflow-pack-design.md
 **Umbrella baseline:** commit 568689d3fa4f9a39500b2b0a294387db02a0fccc, content SHA-256 c2f23807cc36066b4b92478657cacaf15eb5cb6bd14e307e1e76f1c30de0284d
 **Decomposition authority:** 2026-07-13-agent-workflow-pack-feature-spec-decomposition.md at approval commit 1cd99f9767af3f20e4f0c7776f8a1cb7f3c126b2
