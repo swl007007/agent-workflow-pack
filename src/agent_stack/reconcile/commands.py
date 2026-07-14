@@ -9,9 +9,11 @@ from types import MappingProxyType
 from typing import cast
 
 from agent_stack.cli.production import ProductionCommand, _authorize_running_release
+from agent_stack.release.manifest import VerifiedRelease
 
 from .errors import RendererFailure
 from .production_bundle import load_production_bundle
+from .production import compose_init
 
 
 def _data_root() -> Path:
@@ -53,12 +55,14 @@ def _dry_run(command: ProductionCommand, operation: str) -> Mapping[str, object]
 
 def run_init(payload: object) -> Mapping[str, object]:
     command = cast(ProductionCommand, payload)
-    _authorize_running_release()
+    release = _authorize_running_release()
     if bool(command.invocation.options.get("dry_run")):
         return _dry_run(command, "init")
-    raise RendererFailure(
-        "AWP_RECONCILE_RECOVERY_REQUIRED",
-        "production init apply composition is not yet available",
+    return compose_init(
+        command,
+        cast(VerifiedRelease, release),
+        apply=True,
+        data_root=_data_root(),
     )
 
 

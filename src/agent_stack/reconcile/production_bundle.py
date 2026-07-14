@@ -35,6 +35,9 @@ class ProductionBundle:
     template_root: Path
     trellis_layout: VerifiedTrellisTaskLayout
     discovery_schemas: VerifiedDiscoverySchemas
+    route_policy: Mapping[str, object]
+    router_contract: Mapping[str, object]
+    trust_policy: Mapping[str, object]
 
 
 def _failure(message: str, **details: object) -> RendererFailure:
@@ -66,6 +69,12 @@ def _unit_path(root: Path, unit: Mapping[str, object]) -> Path:
             relative = template_by_target[relative]
         except KeyError as error:
             raise _failure("rendered runtime unit lacks one frozen template") from error
+    elif scope == "runtime-package" and relative.startswith("src/agent_stack/"):
+        checkout_candidate = root / relative
+        if checkout_candidate.is_file():
+            return checkout_candidate
+        relative = relative.removeprefix("src/agent_stack/")
+        return root.parent / relative
     return root / relative
 
 
@@ -132,6 +141,9 @@ def load_production_bundle(root: Path) -> ProductionBundle:
     workflow_lock = _load_yaml(root / "catalog/workflow.lock")
     registry = _load_yaml(root / "catalog/runtime-surfaces.yaml")
     inventory = _load_yaml(root / "catalog/runtime-units.yaml")
+    route_policy = _load_yaml(root / "catalog/route-policy.yaml")
+    router_contract = _load_yaml(root / "catalog/router-contract.yaml")
+    trust_policy = _load_yaml(root / "release/trust-policy.yaml")
     try:
         layout_document = json.loads(
             (root / "catalog/trellis-task-layout.json").read_text(encoding="utf-8")
@@ -176,6 +188,9 @@ def load_production_bundle(root: Path) -> ProductionBundle:
         template_root=root / "templates",
         trellis_layout=trellis_layout,
         discovery_schemas=discovery_schemas,
+        route_policy=route_policy,
+        router_contract=router_contract,
+        trust_policy=trust_policy,
     )
 
 

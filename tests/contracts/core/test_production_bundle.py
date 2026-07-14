@@ -16,6 +16,8 @@ REQUIRED_PRODUCTION_INPUTS = (
     "catalog/workflow.lock",
     "catalog/runtime-surfaces.yaml",
     "catalog/runtime-units.yaml",
+    "catalog/route-policy.yaml",
+    "catalog/router-contract.yaml",
     "catalog/trellis-task-layout.json",
     "catalog/trellis-discovery-schemas.json",
     "templates/platforms/codex/AGENTS.md.tmpl",
@@ -70,6 +72,9 @@ def test_production_bundle_validates_closed_schemas_references_and_actual_eviden
     assert all(row["byte_hash"] != "0" * 64 for row in bundle.runtime_unit_evidence)
     assert bundle.trellis_layout.layout_digest
     assert bundle.discovery_schemas.schema_bundle_digest
+    assert bundle.route_policy["default_route"] == "native-light"
+    assert bundle.router_contract["router_id"] == "heavy-development-router"
+    assert bundle.trust_policy["policy_id"] == "github-immutable-release-v1"
 
 
 def test_packaged_trellis_contract_drives_the_real_scanner(tmp_path: Path) -> None:

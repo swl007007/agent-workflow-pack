@@ -331,7 +331,26 @@ def plan_ownership(
                 candidate_contents[path] = record.candidate_bytes
             manifest_candidate = _manifest_record(record, candidate)
         elif record.ownership == "overlay-managed":
-            prefix, block, suffix, marker_map = _overlay_parts(content, target.get("markers"), path=path)
+            marker_map_raw = target.get("markers")
+            begin, end = _markers(marker_map_raw, path=path)
+            marker_map = {"begin": begin, "end": end}
+            begin_token = begin.encode("utf-8") + b"\n"
+            end_token = end.encode("utf-8") + b"\n"
+            if (
+                old_record is None
+                and content is not None
+                and content.count(begin_token) == 0
+                and content.count(end_token) == 0
+            ):
+                prefix = content + (b"" if not content or content.endswith(b"\n") else b"\n")
+                block = b""
+                suffix = b""
+                initial_overlay_insert = True
+            else:
+                prefix, block, suffix, marker_map = _overlay_parts(
+                    content, marker_map_raw, path=path
+                )
+                initial_overlay_insert = False
             observed_block_hash = hashlib.sha256(block).hexdigest()
             candidate_block_hash = hashlib.sha256(record.candidate_bytes).hexdigest()
             observation = MappingProxyType(
@@ -343,9 +362,12 @@ def plan_ownership(
             )
             observations[-1] = observation
             if old_record is None:
-                if observed_block_hash != candidate_block_hash:
+                if initial_overlay_insert:
+                    action, reason = "create", "insert-managed-block"
+                elif observed_block_hash != candidate_block_hash:
                     raise _failure("AWP_OWNERSHIP_CONFLICT", "unmanaged overlay block differs", path=path)
-                reason = "enroll-matching-overlay"
+                else:
+                    reason = "enroll-matching-overlay"
             elif observed_block_hash != old_record.get("managed_block_hash"):
                 if not (
                     operation == "repair"

@@ -1,0 +1,5 @@
+schema_id: agent-workflow.router-contract
+schema_version: 1
+router_id: heavy-development-router
+router_version: 1
+sole_heavy_orchestrator: true
