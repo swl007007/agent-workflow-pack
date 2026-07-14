@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from types import MappingProxyType
 from typing import Final, Never, Sequence
-
 
 class CLIUsageError(ValueError):
     """A parser failure with the frozen usage exit category."""
@@ -40,6 +41,116 @@ class CommandInvocation:
     options: MappingProxyType[str, object]
     json_output: bool
     debug: bool
+
+
+@dataclass(frozen=True)
+class LauncherEnvelope:
+    project_root: Path
+    caller_context_version: int
+    command: tuple[str, ...]
+    caller_fields: MappingProxyType[str, str]
+
+
+_RESERVED_PREFIXES = ("--bootstrap-", "--caller-")
+
+
+def _internal_value(value: str, field: str) -> str:
+    if not value or len(value) > 4096 or any(ord(character) < 32 for character in value):
+        raise CLIUsageError(f"launcher {field} is invalid")
+    return value
+
+
+def _absolute_path(value: str, field: str, *, must_exist: bool = False) -> Path:
+    raw = _internal_value(value, field)
+    path = Path(raw)
+    if not path.is_absolute() or os.path.normpath(raw) != raw:
+        raise CLIUsageError(f"launcher {field} must be a normalized absolute path")
+    if must_exist:
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError as error:
+            raise CLIUsageError(f"launcher {field} is unavailable") from error
+        if resolved != path or not resolved.is_dir():
+            raise CLIUsageError(f"launcher {field} is not a real normalized directory")
+    return path
+
+
+def parse_launcher_envelope(
+    argv: Sequence[str],
+) -> tuple[LauncherEnvelope | None, tuple[str, ...]]:
+    """Validate and strip the reserved launcher prefix before public argparse."""
+
+    values = tuple(argv)
+    reserved_positions = [
+        index
+        for index, value in enumerate(values)
+        if value.startswith(_RESERVED_PREFIXES)
+    ]
+    if not reserved_positions:
+        return None, values
+    if not values or values[0] != "--bootstrap-project":
+        raise CLIUsageError("reserved launcher arguments require a complete prefix envelope")
+
+    index = 0
+
+    def take(name: str) -> str:
+        nonlocal index
+        if index + 1 >= len(values) or values[index] != name:
+            raise CLIUsageError(f"launcher envelope expected {name}")
+        value = _internal_value(values[index + 1], name.removeprefix("--"))
+        index += 2
+        return value
+
+    project_root = _absolute_path(
+        take("--bootstrap-project"), "bootstrap-project", must_exist=True
+    )
+    version = take("--caller-context-version")
+    if version != "1":
+        raise CLIUsageError("launcher caller-context-version is unsupported")
+    platform = take("--caller-platform")
+    if platform not in {"codex", "claude", "opencode", "unknown"}:
+        raise CLIUsageError("launcher caller-platform is unsupported")
+    user_home = _absolute_path(take("--caller-user-home"), "caller-user-home")
+
+    caller_fields: dict[str, str] = {
+        "platform": platform,
+        "user_home": str(user_home),
+    }
+    if index < len(values) and values[index] == "--caller-config-root":
+        config = take("--caller-config-root")
+        if "=" not in config:
+            raise CLIUsageError("launcher caller-config-root is invalid")
+        config_id, config_path = config.split("=", 1)
+        if config_id not in {"codex_home", "claude_home", "opencode_home"}:
+            raise CLIUsageError("launcher caller-config-root identity is unsupported")
+        caller_fields[f"config_root.{config_id}"] = str(
+            _absolute_path(config_path, "caller-config-root")
+        )
+    if index < len(values) and values[index] == "--caller-harness-executable":
+        caller_fields["harness_executable"] = str(
+            _absolute_path(
+                take("--caller-harness-executable"),
+                "caller-harness-executable",
+            )
+        )
+        caller_fields["harness_version_probe_id"] = take(
+            "--caller-harness-version-probe-id"
+        )
+    caller_fields["tty"] = take("--caller-tty")
+    public = values[index:]
+    if not public:
+        raise CLIUsageError("launcher envelope lacks a public command")
+    if any(value.startswith(_RESERVED_PREFIXES) for value in public):
+        raise CLIUsageError("reserved launcher argument appears in the public command")
+    return (
+        LauncherEnvelope(
+            project_root=project_root,
+            caller_context_version=1,
+            command=public,
+            caller_fields=MappingProxyType(caller_fields),
+        ),
+        public,
+    )
 
 
 def _leaf(

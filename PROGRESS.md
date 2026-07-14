@@ -13,12 +13,14 @@
 - Complete release authority preserved across Core Resolver: commit `85f5cb1`.
 - Real packaged-bundle init composition and safe first overlay insertion: commit `c94fdda` plus the current production-init increment.
 - Project launcher, runtime-control descriptor, and workflow lock committed under exact Reconciler control authority: commit `974d762`.
+- Production sync reconstructs committed authority and returns strict no-op without mutation: commit `b387e1e`.
+- Reserved launcher envelope is parsed and stripped before public argparse; unsafe/public mixing fails closed in the current increment.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
 ## In Progress
 
-- Implement production sync from committed Manifest/workspace/runtime-control/workflow-lock authority and prove strict second-sync no-op.
+- Bind the remaining production command owners to reachable domain implementations.
 
 ## Remaining
 
@@ -30,4 +32,4 @@
 
 ## Resume
 
-Add a RED chain that runs sync dry-run, sync apply, and a second sync apply after production init. Load and validate the committed Manifest/workspace/runtime-control/workflow-lock, derive current authority/surface vectors, and require the unchanged second sync to return `no_op: true` without journal or Manifest generation changes.
+Add structural RED tests over all 17 owner bindings, rejecting fixed-failure adapters and exercising representative initialized-project doctor, routing, workspace, task, recovery, and lifecycle commands. Replace placeholders only with real state loaders/domain calls; missing authority must continue to fail closed.

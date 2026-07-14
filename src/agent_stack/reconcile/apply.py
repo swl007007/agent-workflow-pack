@@ -31,7 +31,7 @@ from .models import FileState
 from .plan import render_candidate_manifest
 from .ports import TaskQuiescenceScannerPort
 from .probes import run_write_probe
-from agent_stack.runtime.workspace import build_first_init_local_state
+from .local_state import build_first_init_local_state
 
 
 def _crash_at(point: str) -> None:
