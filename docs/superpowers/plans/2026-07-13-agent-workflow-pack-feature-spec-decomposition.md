@@ -31,8 +31,9 @@
 Before Task 1 starts, run the following baseline check from the repository root:
 
 ```bash
-test "$(git show 568689d3fa4f9a39500b2b0a294387db02a0fccc:docs/superpowers/specs/2026-07-13-agent-workflow-pack-design.md | sha256sum | cut -d' ' -f1)" = "c2f23807cc36066b4b92478657cacaf15eb5cb6bd14e307e1e76f1c30de0284d"
-test "$(git status --porcelain -- docs/superpowers/specs/2026-07-13-agent-workflow-pack-design.md)" = ""
+git merge-base --is-ancestor 568689d3fa4f9a39500b2b0a294387db02a0fccc HEAD
+test "$(git show HEAD:docs/superpowers/specs/2026-07-13-agent-workflow-pack-design.md | sha256sum | cut -d' ' -f1)" = "c2f23807cc36066b4b92478657cacaf15eb5cb6bd14e307e1e76f1c30de0284d"
+test -z "$(git status --porcelain -- docs/superpowers/specs/2026-07-13-agent-workflow-pack-design.md)"
 ```
 
 The umbrella section and acceptance mappings below are frozen against that exact content. A later edit at the same path is not an implicit refresh; stop and obtain an umbrella erratum before changing any owner, consumer, interface, or acceptance mapping.
@@ -48,7 +49,7 @@ interface_digest = SHA256(
 )
 ```
 
-The exact 64-hex digest is written to this plan's interface registry at the producer's `interface-frozen` commit before any consumer starts. A path, filename, version label, or symbolic task number is not an imported interface digest.
+The exact 64-hex digest is computed from an approved producer-content commit `C` and written by a later registry commit `R`. `R` records `producer_content_commit=C`, the digest, and `state=interface-frozen`; it does not attempt to record its own Git hash. A consumer starts only after `R`; its feature-spec content records `C`, `R`, and the same digest. After that consumer content is committed as `D`, a later plan-registry update may record `consumer_content_commit=D` for ancestry auditing. Neither `R` nor `D` is written inside the commit whose identity it names. A path, filename, version label, or symbolic task number is not an imported interface digest.
 
 | Contract | Definition owner | Implementation owner | Imported by | Freeze record |
 |---|---|---|---|---|
@@ -59,26 +60,39 @@ The exact 64-hex digest is written to this plan's interface registry at the prod
 | `CapabilityManifest` schema and capability evaluation result | Task 1 | Task 5 platform projection | Tasks 5–6 | `core.capability-manifest.v1` |
 | `RouteDecision`, `ApprovalProof`, and route-operation discriminated union schema | Task 1 | Task 5 calculation/verification | Tasks 4–6 | `core.route-contract.v1` |
 | `SavedPlanEnvelope` schema, plan-core projection, and digest DAG | Task 1 | Task 3 construction | Tasks 3, 4, 6 | `core.saved-plan.v1` |
-| `TaskSnapshot`/`TaskFindings` schema and fixed workspace/task evaluator policy | Task 1 | Task 4 scanner; Task 3/4 call sites | Tasks 3, 4, 6 | `core.task-quiescence.v1` |
-| Workspace-state and command-admission diagnostic schema | Task 1 | Task 4 state service; Task 6 CLI mapping | Tasks 4–6 | `core.workspace-diagnostics.v1` |
+| `TaskSnapshot`/`TaskFindings` schema and scanner signature | Task 1 | Task 4 scanner | Tasks 3, 4, 6 | `core.task-snapshot.v1` |
+| Fixed workspace-state and task-gate evaluator policy/functions | Task 1 | Task 1 pure evaluator implementation | Tasks 3, 4, 6 | `core.task-evaluators.v1` |
+| Workspace-state and command-admission diagnostic schema/result production | Task 1 | Task 4 state service | Tasks 4–6 | `core.workspace-diagnostics.v1` |
 | Provider plan, acquisition result, approval exception, broker receipt, and attempt journal | Task 2 | Task 2 | Tasks 3, 6 | `providers.execution.v1` |
-| Render-unit/projection interface, ownership decision, reconcile plan, lifecycle journal, CAS and recovery result | Task 1 schemas; Task 3 transaction semantics | Task 3 | Tasks 4–6 | `renderer.reconcile.v1` |
+| Render-unit/projection schema and ownership-decision shape | Task 1 | Task 3 renderer projection | Tasks 3, 5, 6 | `core.render-projection.v1` |
+| Reconcile-plan construction, lifecycle transaction policy, journal, CAS, and recovery result | Task 3 | Task 3 | Tasks 4, 6 | `renderer.reconcile.v1` |
 | Task runtime commands, integration state, task identity, replay ledger, outbox, and task recovery | Task 4 | Task 4 | Task 5 wrapper; Task 6 CLI | `runtime.task-state.v1` |
 | Platform bindings, wrapper projections, discoverable-leaf catalog projection, adapter golden contract | Task 5 | Task 5 | Task 6 | `route.adapters.v1` |
 | Lifecycle command composition, packaging/release gates, compatibility and E2E orchestration | Task 6 | Task 6 | Release CI only | `lifecycle.release.v1` |
-| Domain error-code registry | The feature that owns the domain (Tasks 1–5, partitioned by namespace) | Same domain owner | Task 6 maps only | `domain-error-namespace.v1` per owner |
+| Core/Resolver/workspace diagnostic error namespace | Task 1 | Task 1 | Tasks 2–6 | `core.errors.v1` |
+| Provider/cache error namespace | Task 2 | Task 2 | Tasks 3, 6 | `providers.errors.v1` |
+| Renderer/Reconciler error namespace | Task 3 | Task 3 | Tasks 4, 6 | `renderer.errors.v1` |
+| Runtime/task-state error namespace | Task 4 | Task 4 | Tasks 5, 6 | `runtime.errors.v1` |
+| Route/adapter/capability error namespace | Task 5 | Task 5 | Task 6 | `route.errors.v1` |
 | CLI composition, JSON stdout/stderr/redaction mapping | Task 6 | Task 6 | None may redefine domain semantics | `lifecycle.cli-output.v1` |
 
-`render_saved_plan` is a Task 1 contract with Task 3 implementation ownership. `scan_task_quiescence` and the two evaluator functions are Task 1 contracts with Task 4 scanner/policy-call implementation ownership. Task 1 must not implement either renderer or scanner. Task 5 consumes Task 3's frozen render-unit/projection interface; “approved platform capability contracts” is not an external dependency because the capability contract is defined in Task 1 and projected by Task 5. Task 6 imports all domain command and error contracts and may only compose output; it may not redefine task commands, route semantics, or error meaning.
+`render_saved_plan` is a Task 1 schema/signature contract with Task 3 implementation ownership. `scan_task_quiescence` is a Task 1 schema/signature contract with Task 4 scanner implementation ownership. Task 1 owns and implements the two pure evaluator functions; Task 3 and Task 4 call them without redefining their policy. Task 5 consumes Task 1's render-unit/projection schema and Task 3's frozen renderer projection implementation interface; “approved platform capability contracts” is not an external dependency because the capability contract is defined in Task 1 and projected by Task 5. Task 6 imports all domain command and error contracts and may only compose output; it may not redefine task commands, route semantics, or error meaning.
 
-The interface registry is updated as a structured record, not a prose note:
+The interface registry and consumer imports are structured TSV blocks in this plan, not prose notes. They begin with headers only; later registry commits append validated rows.
 
-```text
-interface_id<TAB>definition_owner<TAB>implementation_owner<TAB>producer_commit<TAB>exported_interface_digest<TAB>imported_by<TAB>required_before_unlock
-core.schema-catalog.v1<TAB>Task 1<TAB>Task 1<TAB><40-hex commit><TAB><64-hex SHA-256><TAB>Tasks 2-6<TAB>Task 2
+<!-- interface-registry:start -->
+```tsv
+interface_id	definition_owner	implementation_owner	producer_content_commit	exported_interface_digest	state	imported_by	required_before_unlock
 ```
+<!-- interface-registry:end -->
 
-Every producer appends one row per exported interface at its `interface-frozen` commit; every consumer records the same 64-hex digest in its `Consumes` block. The validator rejects missing rows, non-hex digests, path-only references, duplicate interface IDs, producer commits that are not ancestors of the consumer commit, or a consumer that starts before `required_before_unlock` is satisfied. The displayed row is the schema of the registry, not an approval to leave angle-bracket values unresolved.
+<!-- consumer-imports:start -->
+```tsv
+consumer_task	consumer_content_commit	interface_id	producer_content_commit	registry_commit	imported_interface_digest
+```
+<!-- consumer-imports:end -->
+
+For each exported interface, first commit the approved feature-spec content and obtain `producer_content_commit=C`. Read the `exported_interface` object from `C`, compute its digest, then create a later registry commit `R` that appends the registry row with `C` and `state=interface-frozen`. The row cannot contain `R` because that would recreate a Git self-reference. A consumer feature spec created after `R` records `C`, `R`, and the same digest and is then committed as `D`; only a later plan-registry update appends the audit row containing `consumer_content_commit=D`. The validator rejects missing or unexpected IDs, non-unique definition ownership, non-hex commits/digests, duplicate IDs, mismatched import digests, a producer content commit that is not an ancestor of the consumer content commit, or a registry commit that is not an ancestor of the consumer content commit.
 
 ### Umbrella section ownership and consumers
 
@@ -125,15 +139,16 @@ draft
   -> approved -> interface-frozen
 ```
 
-At `draft`, create the file with `Status: Draft` and run its structural/schema checks. At `review-requested`, commit the draft and submit it for review. Every finding is either applied or explicitly resolved; unresolved findings keep the feature in `changes-required`. At `revised`, rerun the complete checks, update the owning AC rows and interface registry, and submit again. Only when review reports no remaining blocking finding may the author set `Status: Approved`, commit the approved content, extract the closed `exported_interface` object, compute its exact `interface_digest`, and record the digest plus commit in the interface registry. The final commit is marked `interface-frozen`; the next task is unlocked only after the digest registry and imported-interface references pass validation. A later amendment reopens the feature and all downstream consumers whose imported digest changes.
+At `draft`, create the file with `Status: Draft` and run its structural/schema checks. At `review-requested`, commit the draft and submit it for review. Every finding is either applied or explicitly resolved; unresolved findings keep the feature in `changes-required`. At `revised`, rerun the complete checks and submit again. Only when review reports no remaining blocking finding may the author set `Status: Approved` and commit the approved feature-spec content as `producer_content_commit=C`. The author then reads the closed `exported_interface` object from `C`, computes its exact `interface_digest`, and creates a later registry commit `R` that records `C + interface_digest + interface-frozen`. The next task is unlocked only after `R`; its consumer feature spec records `C`, `R`, and the same digest and is committed as `D`. A later plan-registry update records `D` for audit without asking `D` to contain itself. A later producer amendment creates a new content commit and registry commit and reopens every downstream consumer whose imported digest changes.
 
 The per-task final step must therefore include:
 
 1. commit the draft and set `review-requested`;
 2. apply review findings through `changes-required`/`revised` until clean;
-3. set `Approved` and commit the final content;
-4. compute and record the exported-interface SHA-256 and frozen commit;
-5. validate that every downstream `Consumes` entry names that exact digest before unlocking the next task.
+3. set `Approved` and commit the final feature-spec content as `producer_content_commit=C`;
+4. read `exported_interface` from `C` and compute its SHA-256;
+5. create a later registry commit `R` recording `C`, the digest, and `state=interface-frozen`, without recording `R` inside itself;
+6. unlock the next task only after `R`, require its `Consumes` block to name `C`, `R`, and the exact digest, commit that consumer content as `D`, then record `D` only in a later plan-registry update.
 
 ### Acceptance-criteria primary ownership matrix
 
@@ -198,7 +213,7 @@ The following matrix is authoritative. It contains exactly one primary owner per
 | AC-55 | Task 1 | Tasks 3, 4, 6 | schema/policy/property |
 | AC-56 | Task 4 | Tasks 3, 6 | runtime/concurrency/e2e |
 | AC-57 | Task 1 | Tasks 4, 6 | schema/policy/property |
-| AC-58 | Task 1 | Tasks 4, 5 | schema/policy/property |
+| AC-58 | Task 4 | Tasks 1, 5, 6 | runtime/concurrency/e2e |
 | AC-59 | Task 5 | Tasks 4, 6 | golden/integration |
 | AC-60 | Task 1 | Tasks 4, 6 | schema/policy/property |
 | AC-61 | Task 4 | Tasks 5, 6 | runtime/concurrency/e2e |
@@ -227,7 +242,7 @@ The following matrix is authoritative. It contains exactly one primary owner per
 
 **Interfaces:**
 - Consumes: approved authority model; profile/catalog/workflow-lock contracts; release and artifact bundle identities; Trellis layout declarations; AC-12, AC-14, AC-16, AC-29, AC-34, AC-35, AC-41, AC-51, AC-53 through AC-60, AC-62, and AC-64.
-- Produces: frozen schema catalog and inherited ID/version/digest rules; field-level profile merge and capability evaluation; catalog dependency/conflict/reference closure with disabled precedence; artifact-definition and protected-path validation; canonicalization and digest contracts; runtime-surface registry/inventory and coverage contract; `Desired State IR`; `candidate_impact`; the pure policy contracts for the fixed workspace-state evaluator and operation-specific task gate; the `SavedPlanEnvelope` contract; and structured diagnostics consumed by Tasks 2 through 6. Task 1 defines these contracts only; Task 3 implements `render_saved_plan`, and Task 4 implements `scan_task_quiescence` plus the runtime evaluator call path.
+- Produces: frozen schema catalog and inherited ID/version/digest rules; field-level profile merge and capability evaluation; catalog dependency/conflict/reference closure with disabled precedence; artifact-definition and protected-path validation; canonicalization and digest contracts; runtime-surface registry/inventory and coverage contract; `Desired State IR`; `candidate_impact`; the pure implementations of the fixed workspace-state evaluator and operation-specific task gate; the `SavedPlanEnvelope` schema/signature; and structured diagnostics consumed by Tasks 2 through 6. Task 3 implements `render_saved_plan`; Task 4 implements `scan_task_quiescence`; Tasks 3 and 4 call the Task 1 evaluators.
 
 - [ ] **Step 1: Create the feature-spec skeleton and freeze its boundary**
 
@@ -279,7 +294,7 @@ evaluate_task_gate(operation, candidate_impact, snapshot, findings) -> TaskGateR
 render_saved_plan(plan_core) -> SavedPlanEnvelope
 ```
 
-Define closed input/output fields, deterministic ordering, stable IDs, error precedence, and which downstream feature owns each caller. Task 1 owns the signatures and policy projections; Task 3 owns the `render_saved_plan` implementation; Task 4 owns the scanner and evaluator implementation. Preserve `contract_before_digest`, `observed_before_digest`, and `after_digest` as separate fields. The exported interface block must list each schema ID, schema version, digest domain, callable signature, error namespace, and implementation-owner reference before its digest is frozen.
+Define closed input/output fields, deterministic ordering, stable IDs, error precedence, and which downstream feature owns each caller. Task 1 owns and implements `evaluate_workspace_state_quiescence` and `evaluate_task_gate` as pure Resolver/Policy functions. Task 3 owns the `render_saved_plan` implementation and calls the evaluators during planning/coordination. Task 4 owns `scan_task_quiescence` and calls the evaluators for runtime/workspace state. Preserve `contract_before_digest`, `observed_before_digest`, and `after_digest` as separate fields. The exported interface block must list each schema ID, schema version, digest domain, callable signature, error namespace, and implementation-owner reference before its digest is frozen.
 
 - [ ] **Step 4: Add full coverage and failure-case matrices**
 
@@ -294,7 +309,7 @@ Include tables proving:
 - profile merge, catalog dependency/conflict/reference closure, disabled precedence, capability evaluation, artifact-definition validation, and protected-path validation have one resolver owner and explicit failure cases;
 - every `candidate_impact` surface ID is from the closed registry and carries the old/new digest fields required by the umbrella.
 
-Primary AC ownership is AC-12, AC-13, AC-16, AC-27, AC-33, AC-34, AC-41, AC-51, AC-53, AC-55, AC-57, AC-58, AC-60, AC-62, and AC-64. Tasks 2–6 provide the integration evidence listed in the frozen matrix but may not reassign these primary rows.
+Primary AC ownership is AC-12, AC-13, AC-16, AC-27, AC-33, AC-34, AC-41, AC-51, AC-53, AC-55, AC-57, AC-60, AC-62, and AC-64. Task 1 supplies schema/digest primitives consumed by Task 4 for AC-58 but is not its primary owner. Tasks 2–6 provide the integration evidence listed in the frozen matrix but may not reassign these primary rows.
 
 - [ ] **Step 5: Verify the feature spec**
 
@@ -315,7 +330,7 @@ git add docs/superpowers/specs/2026-07-13-agent-workflow-pack-core-resolver-desi
 git commit -m "Add core resolver feature spec"
 ```
 
-Set the feature to `review-requested`. Apply every review finding through `changes-required` and `revised`, rerun Steps 2–5, then set `Status: Approved` and commit the final content. Extract the closed `exported_interface` object, compute `interface_digest` with the frozen formula, record the digest and commit in the interface registry, and run the imported-interface validator before unlocking Task 2.
+Set the feature to `review-requested`. Apply every review finding through `changes-required` and `revised`, rerun Steps 2–5, then set `Status: Approved` and commit the final feature-spec content as `C`. Read the closed `exported_interface` object from `C`, compute `interface_digest`, and create a later registry commit `R` recording `C`, the digest, and `interface-frozen`. Unlock Task 2 only after `R`; Task 2 records `C`, `R`, and the same digest in its import record.
 
 ---
 
@@ -381,7 +396,7 @@ git add docs/superpowers/specs/2026-07-13-agent-workflow-pack-providers-cache-de
 git commit -m "Add providers and cache feature spec"
 ```
 
-Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the provider checks, then set `Status: Approved` and commit the final content. Compute and record the provider exported-interface digest and frozen commit; validate that Task 3 and Task 6 import those exact digests before unlocking Task 3.
+Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the provider checks, then set `Status: Approved` and commit the final feature-spec content as `C`. Compute the provider interface digest from `C`, then create a later registry commit `R` recording `C + digest + interface-frozen`. Unlock Task 3 only after `R`; Tasks 3 and 6 record the same `C`, `R`, and digest when they consume the interface.
 
 ---
 
@@ -419,7 +434,7 @@ Set the feature to `review-requested`. Apply findings through `changes-required`
 
 - [ ] **Step 2: Freeze transaction phases and file operations**
 
-Define the exact lifecycle transaction phase table, immutable journal header, mutable fields, `journal_binding_digest`, maintenance binding, Manifest-last commit, created-directory cleanup, backup rules, and CAS comparisons over type, bytes, mode, and symlink status. Reconciler pre-commit may perform only journal-recorded, reversible file operations: validated staging writes, same-filesystem renames, backups, exact CAS checks, and cleanup of transaction-created empty directories. Hooks, notifications, subprocess callbacks, network effects, and Git auto-commit are forbidden in pre-commit and cannot be introduced by calling them “outside rollback phases”; optional post-commit effects may use only the already-defined idempotent non-authoritative outbox and may not alter committed state.
+Define the exact lifecycle transaction phase table, immutable journal header, mutable fields, `journal_binding_digest`, maintenance binding, Manifest-last commit, created-directory cleanup, backup rules, and CAS comparisons over type, bytes, mode, and symlink status. Reconciler pre-commit may perform only journal-recorded, reversible file operations: validated staging writes, same-filesystem renames, backups, exact CAS checks, and cleanup of transaction-created empty directories. Hooks, notifications, subprocess callbacks, network effects, Git auto-commit, lifecycle hooks, and new lifecycle outbox mechanisms are forbidden. Task 3 receives no ordinary task-outbox mutation authority; it may only transform existing outbox state as an exact compatibility-edge schema migration already authorized by the umbrella. Task 4 alone defines admission/archive use of the Task-state Service outbox.
 
 - [ ] **Step 3: Freeze ownership and restorative repair behavior**
 
@@ -441,7 +456,7 @@ git add docs/superpowers/specs/2026-07-13-agent-workflow-pack-renderer-reconcile
 git commit -m "Add renderer and reconciler feature spec"
 ```
 
-Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the renderer/reconciler checks, then set `Status: Approved` and commit the final content. Compute and record the renderer exported-interface digest and frozen commit; validate exact imports for Task 4, Task 5, and Task 6 before unlocking Task 4.
+Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the renderer/reconciler checks, then set `Status: Approved` and commit the final feature-spec content as `C`. Compute the renderer interface digest from `C`, then create a later registry commit `R` recording `C + digest + interface-frozen`. Unlock Task 4 only after `R`; Tasks 4, 5, and 6 record the same `C`, `R`, and digest when they consume the interface.
 
 ---
 
@@ -452,7 +467,7 @@ Set the feature to `review-requested`. Apply findings through `changes-required`
 - Consume: the `interface-frozen` digests exported by Tasks 1, 2, and 3; path-only dependencies are invalid.
 
 **Interfaces:**
-- Consumes: the exact Task 1 digests for release/runtime descriptor schemas, workspace diagnostics, task snapshot/evaluators, surface registry, and observed-digest recipes; the exact Task 2 provider/recovery digest where provider state is resumed; and the exact Task 3 Reconciler recovery/transaction digest. It implements the scanner and runtime-state calls defined by Task 1 and consumes Task 3's reversible file-operation boundary.
+- Consumes: the exact Task 1 digests for release/runtime descriptor schemas, workspace diagnostics, task snapshot/evaluators, surface registry, and observed-digest recipes; the exact Task 2 provider/recovery digest where provider state is resumed; and the exact Task 3 Reconciler recovery/transaction digest. It implements the scanner, calls Task 1's pure evaluators, and consumes Task 3's reversible file-operation boundary.
 - Produces: single-file launcher bootstrap, caller-context handoff, workspace register/migrate, task admission/mutation/archive/recovery, runtime-load authorization and dispatch contracts consumed by Task 5 and Task 6.
 
 - [ ] **Step 1: Create the feature-spec skeleton**
@@ -502,7 +517,7 @@ For runtime load, require integration/task identity, expected revision/phase/cla
 
 - [ ] **Step 4: Map task and workspace acceptance criteria**
 
-Primary AC ownership is AC-11, AC-21, AC-23, AC-24, AC-25, AC-31, AC-32, AC-36, AC-38, AC-39, AC-42, AC-43, AC-46, AC-47, AC-48, AC-52, AC-54, AC-56, and AC-61. Task 1 owns the schema/policy portions of AC-33, AC-51, AC-53, AC-55, AC-57, AC-58, AC-60, and AC-64; Task 4 implements and tests those imported contracts without becoming a second definition owner. Include crash points for registration, workspace migration, admission, archive, replay reservation, runtime-load races, and maintenance.
+Primary AC ownership is AC-11, AC-21, AC-23, AC-24, AC-25, AC-31, AC-32, AC-36, AC-38, AC-39, AC-42, AC-43, AC-46, AC-47, AC-48, AC-52, AC-54, AC-56, AC-58, and AC-61. Task 1 owns the schema/policy primitives consumed for AC-33, AC-51, AC-53, AC-55, AC-57, AC-58, AC-60, and AC-64; Task 4 owns AC-58's UUID task identity, ref reuse, archive destination, and runtime uniqueness behavior. Include crash points for registration, workspace migration, admission, archive, replay reservation, runtime-load races, and maintenance.
 
 - [ ] **Step 5: Verify and commit**
 
@@ -520,7 +535,7 @@ git add docs/superpowers/specs/2026-07-13-agent-workflow-pack-runtime-task-state
 git commit -m "Add runtime and task-state feature spec"
 ```
 
-Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the runtime/task-state checks, then set `Status: Approved` and commit the final content. Compute and record the runtime exported-interface digest and frozen commit; validate exact imports for Task 5 and Task 6 before unlocking Task 5.
+Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the runtime/task-state checks, then set `Status: Approved` and commit the final feature-spec content as `C`. Compute the runtime interface digest from `C`, then create a later registry commit `R` recording `C + digest + interface-frozen`. Unlock Task 5 only after `R`; Tasks 5 and 6 record the same `C`, `R`, and digest when they consume the interface.
 
 ---
 
@@ -532,7 +547,7 @@ Set the feature to `review-requested`. Apply findings through `changes-required`
 
 **Interfaces:**
 - Consumes: Task 1's frozen compiled-policy, stable-signal, task-intent, capability, and surface-closure contracts; Task 3's frozen render-unit/projection interface; and Task 4's frozen Task-state Service commands and runtime-load API. It may not redefine any of those domain semantics.
-- Produces: closed Route Decision union, direct-human task approval verifier, platform bindings, generated wrappers, discoverable-leaf projection, adapter golden contracts used by Task 6.
+- Produces: a calculator/verifier conforming to Task 1's frozen closed Route Decision union, direct-human task approval verification semantics, platform bindings, generated wrappers, discoverable-leaf projection, and adapter golden contracts used by Task 6. Task 5 does not redefine the union schema.
 
 - [ ] **Step 1: Create the feature-spec skeleton**
 
@@ -545,7 +560,7 @@ Set the feature to `review-requested`. Apply findings through `changes-required`
 ## 1. Scope and Routing Ownership
 ## 2. Stable Signals and Compiled Heavy Policy
 ## 3. Task Intent Contract
-## 4. Closed Route Decision Union
+## 4. Frozen Route Decision Union Conformance and Calculator
 ## 5. Direct-Human Task-Creation Approval
 ## 6. Task Surface Closure at Admission
 ## 7. Existing-Task Wrapper and Runtime-Load Integration
@@ -556,9 +571,9 @@ Set the feature to `review-requested`. Apply findings through `changes-required`
 ## 12. Acceptance-Criteria Mapping and Downstream Freeze
 ```
 
-- [ ] **Step 2: Freeze route and approval branches**
+- [ ] **Step 2: Freeze calculator/verifier behavior for the imported route branches**
 
-Define exact fields and forbidden cross-branch fields for `classify-only`, `execute-light`, and `create-integrated-task`. Specify policy replay limits, Task Intent signal ownership, task ID/ref/surface/challenge binding, one-time direct-human proof, and the rule that only `task admit` consumes the integrated Decision.
+Import the exact fields and forbidden cross-branch fields for `classify-only`, `execute-light`, and `create-integrated-task` from Task 1's frozen union digest without redefining them. Specify calculator/verifier behavior, policy replay limits, Task Intent signal ownership, task ID/ref/surface/challenge binding, one-time direct-human proof, and the rule that only `task admit` consumes the integrated Decision.
 
 - [ ] **Step 3: Freeze platform wrapper behavior**
 
@@ -582,7 +597,7 @@ git add docs/superpowers/specs/2026-07-13-agent-workflow-pack-route-adapters-des
 git commit -m "Add route and adapter feature spec"
 ```
 
-Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the route/adapter checks, then set `Status: Approved` and commit the final content. Compute and record the route/adapter exported-interface digest and frozen commit; validate exact imports for Task 6 before unlocking Task 6.
+Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the route/adapter checks, then set `Status: Approved` and commit the final feature-spec content as `C`. Compute the route/adapter interface digest from `C`, then create a later registry commit `R` recording `C + digest + interface-frozen`. Unlock Task 6 only after `R`; Task 6 records the same `C`, `R`, and digest when it consumes the interface.
 
 ---
 
@@ -650,16 +665,16 @@ git add docs/superpowers/specs/2026-07-13-agent-workflow-pack-lifecycle-release-
 git commit -m "Add lifecycle and release feature spec"
 ```
 
-Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the lifecycle/release checks, then set `Status: Approved` and commit the final content. Compute and record the lifecycle exported-interface digest and frozen commit. Only after the imported-interface validator, AC matrix validator, and all six `interface-frozen` records pass may the decomposition phase enter the implementation-plan gate. Write one implementation plan per feature spec; do not combine the six subsystems and do not begin production code until the relevant per-feature plan is approved.
+Set the feature to `review-requested`. Apply findings through `changes-required` and `revised`, rerun the lifecycle/release checks, then set `Status: Approved` and commit the final feature-spec content as `C`. Compute the lifecycle interface digest from `C`, then create a later registry commit `R` recording `C + digest + interface-frozen`. Only after the imported-interface validator, AC matrix validator, and all six two-step freeze records pass may the decomposition phase enter the implementation-plan gate. Write one implementation plan per feature spec; do not combine the six subsystems and do not begin production code until the relevant per-feature plan is approved.
 
 ## Plan Completion Gate
 
 The decomposition phase is complete only when:
 
-- the frozen umbrella baseline check passes for commit `568689d3fa4f9a39500b2b0a294387db02a0fccc` and content SHA-256 `c2f23807cc36066b4b92478657cacaf15eb5cb6bd14e307e1e76f1c30de0284d`;
+- the frozen umbrella baseline commit is an ancestor of current `HEAD`, the umbrella bytes at current `HEAD` have SHA-256 `c2f23807cc36066b4b92478657cacaf15eb5cb6bd14e307e1e76f1c30de0284d`, and the umbrella path has no uncommitted change;
 - all six files exist at the exact paths above;
 - all six have status `Approved`;
-- all six have an `interface-frozen` commit and their exported interface rows contain exact 64-hex SHA-256 values;
+- all six have an approved producer-content commit `C` plus a later registry commit `R` whose exported-interface rows contain `C`, `state=interface-frozen`, and exact 64-hex SHA-256 values;
 - their dependency order matches the artifact map;
 - every AC-01 through AC-64 has one primary owner and complete integration coverage;
 - every cross-feature type, schema ID, digest domain, error code, and callable interface has exactly one definition;
@@ -670,27 +685,177 @@ The decomposition phase is complete only when:
 
 ### Structured matrix and interface validation
 
-Run this from the repository root after every feature approval and again before the decomposition completion gate:
+Run this from the repository root with `AWP_REGISTRY_MODE=partial` after every feature approval. Before the decomposition completion gate, set `AWP_REGISTRY_MODE=complete`; complete mode requires every expected interface and consumer import.
 
 ```bash
+: "${AWP_REGISTRY_MODE:=partial}"
+export AWP_REGISTRY_MODE
 python3 - <<'PY'
 from pathlib import Path
+import os
 import re
+import subprocess
 
-plan = Path("docs/superpowers/plans/2026-07-13-agent-workflow-pack-feature-spec-decomposition.md").read_text(encoding="utf-8")
-rows = re.findall(r"^\\| (AC-\\d{2}) \\| ([^|]+) \\| ([^|]+) \\| ([^|]+) \\|$", plan, re.MULTILINE)
+PLAN_PATH = "docs/superpowers/plans/2026-07-13-agent-workflow-pack-feature-spec-decomposition.md"
+plan = Path(PLAN_PATH).read_text(encoding="utf-8")
+rows = re.findall(r"^\| (AC-\d{2}) \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$", plan, re.MULTILINE)
 ids = [int(ac[3:]) for ac, _, _, _ in rows]
 assert ids == list(range(1, 65)), f"AC matrix must contain AC-01..AC-64 exactly once: {ids}"
 assert len({ac for ac, _, _, _ in rows}) == 64
 assert all(owner.strip() in {f"Task {n}" for n in range(1, 7)} for _, owner, _, _ in rows)
 assert all(consumer.strip() and layer.strip() for _, _, consumer, layer in rows)
 
-registry = re.findall(r"^([^|\\n]+)\\|([^|\\n]+)\\|([^|\\n]+)\\|([^|\\n]+)\\|([^|\\n]+)\\|([^|\\n]+)\\|([^|\\n]+)$", plan, re.MULTILINE)
-assert "interface_id" in plan and "exported_interface_digest" in plan
-assert "required_before_unlock" in plan
-assert "interface-frozen" in plan
-print(f"validated {len(rows)} unique AC rows and the structured interface-registry contract")
+expected = {
+    "core.schema-catalog.v1": ("task-1", "task-1", ("task-2", "task-3", "task-4", "task-5", "task-6"), "task-2"),
+    "core.profile-resolution.v1": ("task-1", "task-1", ("task-3", "task-4", "task-5", "task-6"), "task-3"),
+    "core.artifact-policy.v1": ("task-1", "task-1", ("task-3", "task-4", "task-5"), "task-3"),
+    "core.surface-impact.v1": ("task-1", "task-1", ("task-3", "task-4", "task-5", "task-6"), "task-3"),
+    "core.capability-manifest.v1": ("task-1", "task-5", ("task-5", "task-6"), "task-5"),
+    "core.route-contract.v1": ("task-1", "task-5", ("task-4", "task-5", "task-6"), "task-4"),
+    "core.saved-plan.v1": ("task-1", "task-3", ("task-3", "task-4", "task-6"), "task-3"),
+    "core.task-snapshot.v1": ("task-1", "task-4", ("task-3", "task-4", "task-6"), "task-3"),
+    "core.task-evaluators.v1": ("task-1", "task-1", ("task-3", "task-4", "task-6"), "task-3"),
+    "core.workspace-diagnostics.v1": ("task-1", "task-4", ("task-4", "task-5", "task-6"), "task-4"),
+    "providers.execution.v1": ("task-2", "task-2", ("task-3", "task-6"), "task-3"),
+    "core.render-projection.v1": ("task-1", "task-3", ("task-3", "task-5", "task-6"), "task-3"),
+    "renderer.reconcile.v1": ("task-3", "task-3", ("task-4", "task-6"), "task-4"),
+    "runtime.task-state.v1": ("task-4", "task-4", ("task-5", "task-6"), "task-5"),
+    "route.adapters.v1": ("task-5", "task-5", ("task-6",), "task-6"),
+    "lifecycle.release.v1": ("task-6", "task-6", (), "release-ci"),
+    "core.errors.v1": ("task-1", "task-1", ("task-2", "task-3", "task-4", "task-5", "task-6"), "task-2"),
+    "providers.errors.v1": ("task-2", "task-2", ("task-3", "task-6"), "task-3"),
+    "renderer.errors.v1": ("task-3", "task-3", ("task-4", "task-6"), "task-4"),
+    "runtime.errors.v1": ("task-4", "task-4", ("task-5", "task-6"), "task-5"),
+    "route.errors.v1": ("task-5", "task-5", ("task-6",), "task-6"),
+    "lifecycle.cli-output.v1": ("task-6", "task-6", (), "release-ci"),
+}
+consumer_paths = {
+    "task-1": "docs/superpowers/specs/2026-07-13-agent-workflow-pack-core-resolver-design.md",
+    "task-2": "docs/superpowers/specs/2026-07-13-agent-workflow-pack-providers-cache-design.md",
+    "task-3": "docs/superpowers/specs/2026-07-13-agent-workflow-pack-renderer-reconciler-design.md",
+    "task-4": "docs/superpowers/specs/2026-07-13-agent-workflow-pack-runtime-task-state-design.md",
+    "task-5": "docs/superpowers/specs/2026-07-13-agent-workflow-pack-route-adapters-design.md",
+    "task-6": "docs/superpowers/specs/2026-07-13-agent-workflow-pack-lifecycle-release-design.md",
+}
+current_head = subprocess.run(
+    ["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+).stdout.strip()
+
+ownership_section = plan.split("### Cross-feature contract ownership", 1)[1].split("`render_saved_plan`", 1)[0]
+declared = {}
+for line in ownership_section.splitlines():
+    if not line.startswith("|") or line.startswith("|---") or "Freeze record" in line:
+        continue
+    cells = [cell.strip() for cell in line.strip("|").split("|")]
+    if len(cells) != 5 or not re.fullmatch(r"`[^`]+`", cells[4]):
+        continue
+    interface_id = cells[4].strip("`")
+    assert interface_id not in declared, f"duplicate ownership declaration: {interface_id}"
+    declared[interface_id] = cells
+assert set(declared) == set(expected), f"ownership/interface ID mismatch: {set(expected) ^ set(declared)}"
+for interface_id, (definition_owner, implementation_owner, _, _) in expected.items():
+    cells = declared[interface_id]
+    assert cells[1] == f"Task {definition_owner[-1]}", (interface_id, cells[1])
+    assert cells[2].startswith(f"Task {implementation_owner[-1]}"), (interface_id, cells[2])
+
+def parse_tsv_block(text, start_marker, end_marker):
+    segment = text.split(start_marker, 1)[1].split(end_marker, 1)[0]
+    lines = [
+        line for line in segment.splitlines()
+        if line and not line.startswith(chr(96) * 3)
+    ]
+    header = lines[0].split("\t")
+    return [dict(zip(header, line.split("\t"), strict=True)) for line in lines[1:]]
+
+def require_commit(value, field):
+    assert re.fullmatch(r"[0-9a-f]{40}", value), f"{field} must be 40 lowercase hex: {value}"
+    subprocess.run(["git", "cat-file", "-e", f"{value}^{{commit}}"], check=True)
+
+def is_ancestor(ancestor, descendant):
+    return subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, descendant],
+        check=False,
+    ).returncode == 0
+
+registry_rows = parse_tsv_block(plan, "<!-- interface-registry:start -->", "<!-- interface-registry:end -->")
+registry_ids = [row["interface_id"] for row in registry_rows]
+assert len(registry_ids) == len(set(registry_ids)), f"duplicate interface IDs: {registry_ids}"
+assert set(registry_ids) <= set(expected), f"unexpected interface IDs: {set(registry_ids) - set(expected)}"
+
+registry = {}
+for row in registry_rows:
+    interface_id = row["interface_id"]
+    definition_owner, implementation_owner, consumers, unlock = expected[interface_id]
+    assert row["definition_owner"] == definition_owner
+    assert row["implementation_owner"] == implementation_owner
+    require_commit(row["producer_content_commit"], "producer_content_commit")
+    assert is_ancestor(row["producer_content_commit"], current_head)
+    assert re.fullmatch(r"[0-9a-f]{64}", row["exported_interface_digest"])
+    assert row["state"] == "interface-frozen"
+    assert row["imported_by"] == (",".join(consumers) if consumers else "none")
+    assert row["required_before_unlock"] == unlock
+    registry[interface_id] = row
+
+mode = os.environ["AWP_REGISTRY_MODE"]
+assert mode in {"partial", "complete"}
+if mode == "complete":
+    assert set(registry) == set(expected), f"missing interface IDs: {set(expected) - set(registry)}"
+
+import_rows = parse_tsv_block(plan, "<!-- consumer-imports:start -->", "<!-- consumer-imports:end -->")
+import_keys = [(row["consumer_task"], row["interface_id"]) for row in import_rows]
+assert len(import_keys) == len(set(import_keys)), f"duplicate consumer imports: {import_keys}"
+
+for row in import_rows:
+    interface_id = row["interface_id"]
+    assert interface_id in registry, f"import references unfrozen interface: {interface_id}"
+    producer = registry[interface_id]
+    assert row["consumer_task"] in expected[interface_id][2]
+    require_commit(row["consumer_content_commit"], "consumer_content_commit")
+    require_commit(row["producer_content_commit"], "producer_content_commit")
+    require_commit(row["registry_commit"], "registry_commit")
+    assert row["producer_content_commit"] == producer["producer_content_commit"]
+    assert row["imported_interface_digest"] == producer["exported_interface_digest"]
+    assert is_ancestor(row["producer_content_commit"], row["consumer_content_commit"])
+    assert is_ancestor(row["registry_commit"], row["consumer_content_commit"])
+    assert is_ancestor(row["consumer_content_commit"], current_head)
+
+    consumer_spec = subprocess.run(
+        ["git", "show", f"{row['consumer_content_commit']}:{consumer_paths[row['consumer_task']]}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert row["producer_content_commit"] in consumer_spec
+    assert row["registry_commit"] in consumer_spec
+    assert row["imported_interface_digest"] in consumer_spec
+
+    registry_text = subprocess.run(
+        ["git", "show", f"{row['registry_commit']}:{PLAN_PATH}"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    registry_at_r = {
+        item["interface_id"]: item
+        for item in parse_tsv_block(registry_text, "<!-- interface-registry:start -->", "<!-- interface-registry:end -->")
+    }
+    assert interface_id in registry_at_r
+    assert registry_at_r[interface_id]["producer_content_commit"] == row["producer_content_commit"]
+    assert registry_at_r[interface_id]["exported_interface_digest"] == row["imported_interface_digest"]
+
+if mode == "complete":
+    expected_imports = {
+        (consumer, interface_id)
+        for interface_id, (_, _, consumers, _) in expected.items()
+        for consumer in consumers
+    }
+    assert set(import_keys) == expected_imports, f"missing imports: {expected_imports - set(import_keys)}"
+
+print(
+    f"validated {len(rows)} AC rows, {len(registry_rows)} frozen interfaces, "
+    f"and {len(import_rows)} consumer imports in {mode} mode"
+)
 PY
 ```
 
-The script is only the minimum structural check. It must be supplemented by verifying each six-feature spec's recorded producer commit is an ancestor of every consumer commit and that every imported digest equals the producer's recorded `exported_interface_digest`; a missing or symbolic digest is a hard failure, not a warning. Keyword searches remain auxiliary evidence only.
+The validator performs the Git ancestry and registry-snapshot checks itself. Partial mode permits only a valid subset while feature specs are being approved; complete mode requires all expected interface IDs and all required consumer imports. A missing or symbolic digest is a hard failure, not a warning. Keyword searches remain auxiliary evidence only.
