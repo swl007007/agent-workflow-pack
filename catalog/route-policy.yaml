@@ -1,0 +1,25 @@
+schema_id: agent-workflow.route-policy
+schema_version: 1
+policy_version: 1
+default_route: native-light
+hard_signals:
+  - acceptance_criteria_blocking_ambiguity
+  - architecture_or_subsystem_change
+  - audit_traceability_required
+  - dependency_or_external_integration_change
+  - deployment_or_rollback_change
+  - explicit_heavy_workflow
+  - irreversible_or_destructive_operation
+  - multi_session_coordination
+  - public_contract_change
+  - reproducibility_provenance_governance
+  - resource_or_large_data_risk
+  - schema_or_data_migration
+  - security_permission_change
+compound_rules:
+  - rule_id: compound:brownfield-compatibility
+    all: [brownfield_uncertainty, compatibility_risk]
+  - rule_id: compound:multi-module-contract
+    all: [contract_surface, multi_module]
+  - rule_id: compound:resource-long-running
+    all: [long_running_operation, resource_sensitive]

@@ -1,0 +1,49 @@
+cases:
+  - legacy_trigger: explicit heavy workflow
+    signals: [explicit_heavy_workflow]
+    route: speckit-superpowers
+  - legacy_trigger: auditability
+    signals: [audit_traceability_required]
+    route: speckit-superpowers
+  - legacy_trigger: permissions
+    signals: [security_permission_change]
+    route: speckit-superpowers
+  - legacy_trigger: public contract
+    signals: [public_contract_change]
+    route: speckit-superpowers
+  - legacy_trigger: data migration
+    signals: [schema_or_data_migration]
+    route: speckit-superpowers
+  - legacy_trigger: destructive operation
+    signals: [irreversible_or_destructive_operation]
+    route: speckit-superpowers
+  - legacy_trigger: deployment rollback
+    signals: [deployment_or_rollback_change]
+    route: speckit-superpowers
+  - legacy_trigger: multi-session
+    signals: [multi_session_coordination]
+    route: speckit-superpowers
+  - legacy_trigger: architecture
+    signals: [architecture_or_subsystem_change]
+    route: speckit-superpowers
+  - legacy_trigger: external dependency
+    signals: [dependency_or_external_integration_change]
+    route: speckit-superpowers
+  - legacy_trigger: large data
+    signals: [resource_or_large_data_risk]
+    route: speckit-superpowers
+  - legacy_trigger: provenance governance
+    signals: [reproducibility_provenance_governance]
+    route: speckit-superpowers
+  - legacy_trigger: blocking ambiguity
+    signals: [acceptance_criteria_blocking_ambiguity]
+    route: speckit-superpowers
+  - legacy_trigger: multi-module contract
+    signals: [multi_module, contract_surface]
+    route: speckit-superpowers
+  - legacy_trigger: brownfield compatibility
+    signals: [brownfield_uncertainty, compatibility_risk]
+    route: speckit-superpowers
+  - legacy_trigger: long resource operation
+    signals: [resource_sensitive, long_running_operation]
+    route: speckit-superpowers
