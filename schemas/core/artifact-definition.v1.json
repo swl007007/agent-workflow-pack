@@ -1,0 +1,121 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.artifact-definition",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": ["agent-workflow.artifact-definition.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "id",
+    "source",
+    "targets",
+    "forbidden_paths",
+    "validators"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.artifact-definition"},
+    "schema_version": {"const": 1},
+    "id": {"$ref": "#/definitions/stableToken"},
+    "source": {"type": "string", "minLength": 1},
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "oneOf": [
+          {"$ref": "#/definitions/managedTarget"},
+          {"$ref": "#/definitions/overlayTarget"},
+          {"$ref": "#/definitions/createOnceTarget"},
+          {"$ref": "#/definitions/adoptedTarget"},
+          {"$ref": "#/definitions/userOwnedTarget"}
+        ]
+      }
+    },
+    "forbidden_paths": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "validators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "version"],
+        "properties": {
+          "id": {"$ref": "#/definitions/stableToken"},
+          "version": {"type": "integer", "minimum": 1}
+        }
+      }
+    }
+  },
+  "definitions": {
+    "stableToken": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+    "markerPair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["begin", "end"],
+      "properties": {
+        "begin": {"type": "string", "minLength": 1},
+        "end": {"type": "string", "minLength": 1}
+      }
+    },
+    "managedTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership", "merge_strategy", "mode_policy", "mode"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "ownership": {"const": "managed"},
+        "merge_strategy": {"const": "whole-file"},
+        "mode_policy": {"const": "exact"},
+        "mode": {"type": "string", "pattern": "^0[0-7]{3}$"}
+      }
+    },
+    "overlayTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership", "merge_strategy", "mode_policy", "markers"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "ownership": {"const": "overlay-managed"},
+        "merge_strategy": {"const": "marked-block"},
+        "mode_policy": {"const": "preserve"},
+        "markers": {"$ref": "#/definitions/markerPair"}
+      }
+    },
+    "createOnceTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership", "merge_strategy", "mode_policy", "mode"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "ownership": {"const": "create-once-then-user-owned"},
+        "merge_strategy": {"const": "whole-file"},
+        "mode_policy": {"const": "exact"},
+        "mode": {"type": "string", "pattern": "^0[0-7]{3}$"}
+      }
+    },
+    "adoptedTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership", "merge_strategy", "mode_policy"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "ownership": {"const": "adopted"},
+        "merge_strategy": {"const": "observe-baseline"},
+        "mode_policy": {"const": "preserve"}
+      }
+    },
+    "userOwnedTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "ownership", "merge_strategy", "mode_policy"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "ownership": {"const": "user-owned"},
+        "merge_strategy": {"const": "none"},
+        "mode_policy": {"const": "preserve"}
+      }
+    }
+  }
+}

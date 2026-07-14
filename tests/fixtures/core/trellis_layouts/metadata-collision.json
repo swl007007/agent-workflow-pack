@@ -1,0 +1,56 @@
+{
+  "schema_id": "agent-workflow.trellis-task-layout",
+  "schema_version": 1,
+  "adapter_id": "trellis-v0.1",
+  "adapter_version": "1.0.0",
+  "runtime_namespace": ".trellis",
+  "active_root": ".trellis/tasks",
+  "archive_root": ".trellis/tasks/archive",
+  "task_discovery": {
+    "hierarchy": "one-segment",
+    "segment_grammar_id": "safe-nfc-segment-v1",
+    "integration_relative_path": "integration.yaml",
+    "integration_schema_id": "agent-workflow.integration",
+    "integration_schema_versions": [1],
+    "unknown_root_entry_policy": "block",
+    "allowed_non_task_entries": [],
+    "max_scan_depth": 1,
+    "max_tasks": 10000,
+    "max_root_entries": 10000,
+    "max_integration_bytes": 1048576
+  },
+  "metadata_contracts": [
+    {
+      "kind": "bounded",
+      "contract_id": "unsafe-source-journals",
+      "root": "src/sessions",
+      "segment_grammar_id": "uuid-json-v1",
+      "max_depth": 1,
+      "max_matches": 10000,
+      "schema_id": "trellis.session-journal",
+      "schema_versions": [1],
+      "parser_id": "json-object-v1",
+      "parser_version": 1,
+      "classifier_id": "trellis-session-v1",
+      "classifier_version": 1,
+      "semantic_role": "session-journal",
+      "task_ref_fields": ["/task_ref"],
+      "max_bytes": 1048576,
+      "absence_is_empty": true,
+      "canonical_empty_state_id": "no-sessions"
+    }
+  ],
+  "task_transaction_discovery": {
+    "root": ".agent-workflow/task-transactions",
+    "filename_grammar_id": "uuid-json-v1",
+    "schema_id": "agent-workflow.task-transaction",
+    "schema_versions": [1],
+    "phase_classifier_id": "task-transaction-phase-v1",
+    "phase_classifier_version": 1,
+    "task_id_field": "/task_id",
+    "task_ref_fields": ["/task_ref"],
+    "terminal_phases": ["complete"],
+    "max_journals": 10000,
+    "max_journal_bytes": 1048576
+  }
+}
