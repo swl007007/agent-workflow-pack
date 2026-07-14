@@ -204,7 +204,7 @@ def _first_party_component(root: Path) -> dict[str, object]:
         "version": version,
         "source": {
             "type": "git-release",
-            "repository": "github.com/example/agent-workflow-pack",
+            "repository": "github.com/swl007007/agent-workflow-pack",
             "release_binding": "detached-manifest-source-commit",
             "version_source": "pyproject.toml",
         },
