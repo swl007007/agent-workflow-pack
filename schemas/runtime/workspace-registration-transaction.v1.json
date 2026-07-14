@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.workspace-registration-transaction",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.workspace-registration.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "transaction_id", "operation", "project_id", "workspace_instance_id", "original_state", "workspace_candidate", "workspace_candidate_digest", "replay_candidate", "replay_candidate_digest", "recovery_runtime", "phase", "rollback_state"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.workspace-registration-transaction"},
+    "schema_version": {"const": 1},
+    "transaction_id": {"$ref": "#/definitions/uuid"},
+    "operation": {"const": "workspace-register"},
+    "project_id": {"$ref": "#/definitions/uuid"},
+    "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+    "original_state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["workspace", "approval_replay"],
+      "properties": {"workspace": {"const": "absent"}, "approval_replay": {"const": "absent"}}
+    },
+    "workspace_candidate": {"type": "object"},
+    "workspace_candidate_digest": {"$ref": "#/definitions/sha256"},
+    "replay_candidate": {"type": "object"},
+    "replay_candidate_digest": {"$ref": "#/definitions/sha256"},
+    "recovery_runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["runtime_role", "release_id", "release_manifest_digest"],
+      "properties": {
+        "runtime_role": {"enum": ["committed", "candidate"]},
+        "release_id": {"$ref": "#/definitions/sha256"},
+        "release_manifest_digest": {"$ref": "#/definitions/sha256"}
+      }
+    },
+    "phase": {"enum": ["planned", "workspace_written", "registration_committed", "cleanup_pending", "complete"]},
+    "rollback_state": {"type": "object"}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}

@@ -9,6 +9,12 @@ from .bootstrap import (
 )
 from .caller_context import VerifiedCallerContext, verify_caller_context
 from .errors import RuntimeFailure
+from .workspace import (
+    WorkspaceRegistrationResult,
+    recover_workspace_registration,
+    register_workspace,
+    validate_workspace_pair,
+)
 
 __all__ = [
     "LauncherContract",
@@ -16,7 +22,11 @@ __all__ = [
     "RuntimeFailure",
     "VerifiedCallerContext",
     "VerifiedRuntimeInvocation",
+    "WorkspaceRegistrationResult",
     "bootstrap_project_runtime",
     "launcher_contract_from_release",
+    "recover_workspace_registration",
+    "register_workspace",
+    "validate_workspace_pair",
     "verify_caller_context",
 ]

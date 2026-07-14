@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.approval-replay",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.approval-proof-key.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "project_id", "workspace_instance_id", "entries"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.approval-replay"},
+    "schema_version": {"const": 1},
+    "project_id": {"$ref": "#/definitions/uuid"},
+    "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+    "entries": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[0-9a-f]{64}$"},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bound_transaction_id", "state", "validated_at", "proof_expires_at", "consumed_at"],
+        "properties": {
+          "bound_transaction_id": {"$ref": "#/definitions/uuid"},
+          "state": {"enum": ["reserved", "consumed"]},
+          "validated_at": {"type": "string", "format": "date-time"},
+          "proof_expires_at": {"type": "string", "format": "date-time"},
+          "consumed_at": {"type": ["string", "null"], "format": "date-time"}
+        }
+      }
+    }
+  },
+  "definitions": {
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}

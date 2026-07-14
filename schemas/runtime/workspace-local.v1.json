@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.workspace-local",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "project_id", "workspace_instance_id", "local_state_release_id", "local_state_release_version", "local_state_release_manifest_digest", "local_state_contract_digest", "trellis_task_layout", "local_state_schemas"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.workspace-local"},
+    "schema_version": {"const": 1},
+    "project_id": {"$ref": "#/definitions/uuid"},
+    "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+    "local_state_release_id": {"$ref": "#/definitions/sha256"},
+    "local_state_release_version": {"type": "string", "minLength": 1},
+    "local_state_release_manifest_digest": {"$ref": "#/definitions/sha256"},
+    "local_state_contract_digest": {"$ref": "#/definitions/sha256"},
+    "trellis_task_layout": {"type": "object"},
+    "local_state_schemas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace", "approval_replay", "task_outbox"],
+      "properties": {
+        "workspace": {"const": 1},
+        "approval_replay": {"const": 1},
+        "task_outbox": {"const": 1}
+      }
+    }
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}
