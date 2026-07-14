@@ -1,0 +1,67 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from agent_stack._vendor import yaml
+
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def load_workflow(name: str) -> dict[str, object]:
+    value = yaml.safe_load((ROOT / ".github/workflows" / name).read_text(encoding="utf-8"))
+    assert isinstance(value, dict)
+    return value
+
+
+def step_runs(job: dict[str, object]) -> list[str]:
+    steps = job["steps"]
+    assert isinstance(steps, list)
+    return [str(step.get("run", "")) for step in steps if isinstance(step, dict)]
+
+
+def test_ci_matrix_covers_python_311_through_314_and_artifact_gates() -> None:
+    workflow = load_workflow("ci.yml")
+    jobs = workflow["jobs"]
+    assert isinstance(jobs, dict)
+    test_job = jobs["test"]
+    assert isinstance(test_job, dict)
+    strategy = test_job["strategy"]
+    assert isinstance(strategy, dict)
+    matrix = strategy["matrix"]
+    assert isinstance(matrix, dict)
+
+    assert matrix["python-version"] == ["3.11", "3.12", "3.13", "3.14"]
+    commands = step_runs(test_job)
+    assert next(i for i, value in enumerate(commands) if "generate_notices.py --check" in value) < next(
+        i for i, value in enumerate(commands) if "build_artifacts.py" in value
+    )
+    assert any("sync_runtime_vendor.py --check" in value for value in commands)
+    assert any("tests/packaging" in value and "tests/integration/release" in value for value in commands)
+
+
+def test_release_workflow_orders_build_gate_manifest_publish_and_reverify() -> None:
+    workflow = load_workflow("release.yml")
+    jobs = workflow["jobs"]
+    assert isinstance(jobs, dict)
+    build = jobs["build-and-gate"]
+    publish = jobs["publish-immutable"]
+    assert isinstance(build, dict) and isinstance(publish, dict)
+    assert publish["needs"] == "build-and-gate"
+    build_commands = step_runs(build)
+    publish_commands = step_runs(publish)
+
+    assert any("build_artifacts.py" in value for value in build_commands)
+    assert not any("release-manifest.json" in value for value in build_commands)
+    assert not any("uv build" in value for value in publish_commands)
+    verify_index = next(
+        i for i, value in enumerate(publish_commands) if "--verify-existing" in value
+    )
+    publish_index = next(
+        i for i, value in enumerate(publish_commands) if "publish_release.py" in value
+    )
+    reverify_index = next(
+        i for i, value in enumerate(publish_commands) if "verify_published_release.py" in value
+    )
+    assert verify_index < publish_index < reverify_index
+    assert "immutable" in repr(publish).casefold()

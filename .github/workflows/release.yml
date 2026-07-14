@@ -1,0 +1,60 @@
+name: immutable-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Exact immutable release version
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: uv sync --locked
+      - run: uv run python tools/vendor/sync_runtime_vendor.py --check
+      - run: uv run python tools/release/generate_notices.py --check
+      - run: uv run python tools/release/build_artifacts.py
+      - run: uv run pytest tests/packaging tests/integration/release/test_release_gates.py -q
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gated-final-distributions
+          if-no-files-found: error
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+            dist/release-artifact-set.json
+
+  publish-immutable:
+    needs: build-and-gate
+    runs-on: ubuntu-latest
+    environment: immutable-release
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - uses: actions/download-artifact@v4
+        with:
+          name: gated-final-distributions
+          path: dist
+      - run: uv sync --locked
+      - run: uv run python tools/release/build_artifacts.py --verify-existing dist/release-artifact-set.json
+      - name: Publish once and make immutable
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run python tools/release/publish_release.py --version "${{ inputs.version }}" --source-commit "$GITHUB_SHA"
+      - name: Re-fetch immutable assets and verify exact hashes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run python tools/release/verify_published_release.py --version "${{ inputs.version }}" --source-commit "$GITHUB_SHA"
