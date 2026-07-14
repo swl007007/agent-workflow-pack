@@ -129,3 +129,10 @@ def test_release_body_is_complete_deterministic_projection() -> None:
 def test_release_gate_registry_includes_canonical_first_install_publication() -> None:
     assert "canonical-first-install-publication" in gates._GATE_IDS
     assert len(gates._GATE_IDS) == 14
+
+
+def test_renderer_inventory_check_reads_logical_file_paths() -> None:
+    class Record:
+        path = "agent_stack/release/first_install.py"
+
+    assert gates._has_canonical_first_install_renderer((Record(),)) is True
