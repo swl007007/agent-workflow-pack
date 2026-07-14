@@ -9,6 +9,9 @@ description = "Self-contained workflow-pack runtime and control plane"
 requires-python = ">=3.11,<3.15"
 license = "Apache-2.0"
 
+[project.scripts]
+agent-stack = "agent_stack.__main__:main"
+
 [dependency-groups]
 dev = [
   "build>=1.2,<2",
@@ -23,6 +26,36 @@ default-groups = ["dev"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_stack"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"schemas" = "agent_stack/data/schemas"
+"catalog" = "agent_stack/data/catalog"
+"artifact-definitions" = "agent_stack/data/artifact-definitions"
+"overlays" = "agent_stack/data/overlays"
+"runtime-launcher" = "agent_stack/data/runtime-launcher"
+"compatibility" = "agent_stack/data/compatibility"
+"release/trust-policy.yaml" = "agent_stack/data/release/trust-policy.yaml"
+"release/provenance-lock.json" = "agent_stack/data/release/provenance-lock.json"
+"vendor/runtime-vendor-lock.json" = "agent_stack/data/vendor/runtime-vendor-lock.json"
+"LICENSES" = "agent_stack/data/LICENSES"
+"THIRD_PARTY_NOTICES.md" = "agent_stack/data/THIRD_PARTY_NOTICES.md"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/agent_stack",
+  "schemas",
+  "catalog",
+  "artifact-definitions",
+  "overlays",
+  "runtime-launcher",
+  "compatibility",
+  "release/trust-policy.yaml",
+  "release/provenance-lock.json",
+  "vendor/runtime-vendor-lock.json",
+  "LICENSES",
+  "THIRD_PARTY_NOTICES.md",
+  "pyproject.toml",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
