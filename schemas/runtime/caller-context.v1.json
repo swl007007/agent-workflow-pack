@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.caller-context",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.caller-context.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "platform", "user_home", "config_roots", "harness", "tty"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.caller-context"},
+    "schema_version": {"const": 1},
+    "platform": {"enum": ["codex", "claude", "opencode"]},
+    "user_home": {"$ref": "#/definitions/absolutePath"},
+    "config_roots": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "codex_home": {"$ref": "#/definitions/absolutePath"},
+        "claude_home": {"$ref": "#/definitions/absolutePath"},
+        "opencode_home": {"$ref": "#/definitions/absolutePath"}
+      }
+    },
+    "harness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executable", "version_probe_id"],
+      "properties": {
+        "executable": {"$ref": "#/definitions/absolutePath"},
+        "version_probe_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._-]+$"}
+      }
+    },
+    "tty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stdin", "stdout", "stderr", "direct_confirmation_capable"],
+      "properties": {
+        "stdin": {"type": "boolean"},
+        "stdout": {"type": "boolean"},
+        "stderr": {"type": "boolean"},
+        "direct_confirmation_capable": {"type": "boolean"}
+      }
+    }
+  },
+  "definitions": {
+    "absolutePath": {"type": "string", "minLength": 1, "maxLength": 4096, "pattern": "^/[^\\r\\n\\u0000]*$"}
+  }
+}

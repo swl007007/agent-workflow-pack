@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import subprocess
 import sys
 from types import MappingProxyType
 
@@ -55,4 +56,16 @@ def test_contract_fake_records_all_four_inputs_without_runtime_import() -> None:
 
     assert fake(layout, layout, schemas, schemas) is result
     assert len(fake.calls) == 1
-    assert not any(name.startswith("agent_stack.runtime") for name in sys.modules)
+    isolated = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys; sys.dont_write_bytecode = True; "
+            "import agent_stack.reconcile.ports; "
+            "assert not any(name.startswith('agent_stack.runtime') for name in sys.modules)",
+        ],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    assert isolated.returncode == 0, isolated.stderr
