@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.surface-coverage-proof",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": ["agent-workflow.surface-coverage.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "covered_unit_ids",
+    "surface_ids",
+    "registry_digest",
+    "proof_digest"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.surface-coverage-proof"},
+    "schema_version": {"const": 1},
+    "covered_unit_ids": {"type": "array", "items": {"type": "string"}},
+    "surface_ids": {"type": "array", "items": {"type": "string"}},
+    "registry_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "proof_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

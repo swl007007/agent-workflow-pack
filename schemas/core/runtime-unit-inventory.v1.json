@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.runtime-unit-inventory",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "units"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.runtime-unit-inventory"},
+    "schema_version": {"const": 1},
+    "units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_id",
+          "unit_kind",
+          "distribution_scope",
+          "normalized_path",
+          "owning_surface_id",
+          "leaf_recipe_id",
+          "runtime_visible"
+        ],
+        "properties": {
+          "unit_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9._:/-]*$"},
+          "unit_kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "distribution_scope": {"enum": ["runtime-package", "rendered-project"]},
+          "normalized_path": {"type": "string", "minLength": 1},
+          "owning_surface_id": {"type": "string", "minLength": 1},
+          "leaf_recipe_id": {"const": "bytes-mode-contract-v1"},
+          "runtime_visible": {"const": true}
+        }
+      }
+    }
+  }
+}
