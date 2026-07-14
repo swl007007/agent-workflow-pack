@@ -1,0 +1,13 @@
+{
+  "blocked_bypass_entries": ["/speckit.implement", "trellis-implement-direct", "direct-trellis-archive"],
+  "candidate_leaf_digests": [
+    "61232d98f80c3670a154d8412f772fee1a5665346f113e3bf036f812695feff2",
+    "831ab77a2e60e2795935ed24c5061819ad27a8789c8b6a35dce8187b8f8ffc41",
+    "a65481272f4084260ab52b287ab23b7f954f46ac57b9d4255c366d616006b600"
+  ],
+  "discoverable": ["instruction:codex-agents", "skill:codex-agent-workflow"],
+  "modes": ["preserve", "0644", "0755"],
+  "paths": ["AGENTS.md", ".agents/skills/agent-workflow/SKILL.md", ".agent-workflow/bin/codex-wrapper"],
+  "platform": "codex",
+  "wrapper_entries": ["sol-native", "trellis-implement", "heavy-development-router"]
+}

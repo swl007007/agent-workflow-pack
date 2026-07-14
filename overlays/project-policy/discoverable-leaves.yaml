@@ -1,0 +1,9 @@
+schema_id: agent-workflow.discoverable-leaf-policy
+schema_version: 1
+gated_entry_ids:
+  - router:heavy-development-router
+  - runtime-entry:trellis-native
+  - skill:claude-mem-compactor
+  - skill:sdd-superpower-micro-plan
+  - skill:speckit-evidence-pack
+compatibility_overlays: []

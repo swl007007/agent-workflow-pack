@@ -1,0 +1,13 @@
+{
+  "blocked_bypass_entries": ["/speckit.implement", "/trellis-implement", "direct-trellis-archive"],
+  "candidate_leaf_digests": [
+    "e6ba22671943bf7ea96de15f44a9bfcd17c0e1945ce60e13ed0fd71b065914ab",
+    "3a8fee4a65132e3989ddb5785f61715d0f375d023078437a41b52162a1a66591",
+    "8c6f3ad0ffa9569dab5f34206c8d33149f8049d47abd78c7e89fab85e1dd9a79"
+  ],
+  "discoverable": ["instruction:opencode-project", "command:opencode-agent-stack"],
+  "modes": ["0644", "0644", "0644"],
+  "paths": [".opencode/instructions/agent-workflow.md", ".opencode/commands/agent-stack.md", ".opencode/plugins/agent-workflow.js"],
+  "platform": "opencode",
+  "wrapper_entries": ["opencode-plan", "trellis-implement", "heavy-development-router"]
+}

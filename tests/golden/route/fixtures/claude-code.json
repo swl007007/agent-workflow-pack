@@ -1,0 +1,13 @@
+{
+  "blocked_bypass_entries": ["/speckit.implement", "/trellis.implement", "direct-trellis-archive"],
+  "candidate_leaf_digests": [
+    "2e13c9ac483cdd564a33ae28f80713c34d27e429622792063f53b3e250c1e902",
+    "ac339b11dda057f049578246879f135d1f5d993991ed1aad696d824c4d0725d9",
+    "36fe2a243fd89a9ea26cb3d9f73734601c5a5a9bebb2659a8e57cc24ef8eac6b"
+  ],
+  "discoverable": ["instruction:claude-project", "command:claude-agent-stack"],
+  "modes": ["preserve", "0644", "0755"],
+  "paths": ["CLAUDE.md", ".claude/commands/agent-stack.md", ".claude/hooks/agent-workflow-gate.sh"],
+  "platform": "claude-code",
+  "wrapper_entries": ["claude-plan", "trellis-implement", "heavy-development-router"]
+}
