@@ -1,6 +1,6 @@
 # Agent Workflow Pack Core Resolver Implementation Plan
 
-**Status:** Draft — implementation-plan review required
+**Status:** Approved — implementation-plan frozen
 
 > **Execution contract:** Execute only under the current route/integration contract. If the admitted mode is speckit-superpowers, heavy-development-router is the sole top-level orchestrator; Superpowers tools may be leaf disciplines only. Track every step with the checkboxes below.
 

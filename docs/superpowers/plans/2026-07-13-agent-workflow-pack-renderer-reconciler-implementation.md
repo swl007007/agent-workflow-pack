@@ -1,6 +1,6 @@
 # Agent Workflow Pack Renderer and Reconciler Implementation Plan
 
-**Status:** Draft — implementation-plan review required
+**Status:** Approved — implementation-plan frozen
 
 > **Execution contract:** Execute under the current route/integration contract. heavy-development-router is the only heavy top-level orchestrator. Track all steps with checkboxes.
 

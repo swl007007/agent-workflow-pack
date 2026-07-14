@@ -1,6 +1,6 @@
 # Agent Workflow Pack Runtime Launcher and Task-State Implementation Plan
 
-**Status:** Draft — implementation-plan review required
+**Status:** Approved — implementation-plan frozen
 
 > **Execution contract:** Execute only through the current route/integration contract. In heavy mode, heavy-development-router is the sole top-level orchestrator. Track each step below.
 

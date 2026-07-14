@@ -1,6 +1,6 @@
 # Agent Workflow Pack Lifecycle Packaging and Release Implementation Plan
 
-**Status:** Draft — implementation-plan review required
+**Status:** Approved — implementation-plan frozen
 
 > **Execution contract:** Execute only under the current route/integration contract. In heavy mode, heavy-development-router remains the sole top-level orchestrator. Track each step below.
 

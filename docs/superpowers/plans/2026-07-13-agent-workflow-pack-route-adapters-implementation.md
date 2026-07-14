@@ -1,6 +1,6 @@
 # Agent Workflow Pack Route Admission and Platform Adapters Implementation Plan
 
-**Status:** Draft — implementation-plan review required
+**Status:** Approved — implementation-plan frozen
 
 > **Execution contract:** Execute under the current route/integration contract. heavy-development-router is the sole top-level orchestrator for admitted heavy tasks; Superpowers components are leaves only. Track all steps below.
 
