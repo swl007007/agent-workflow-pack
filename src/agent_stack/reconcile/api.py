@@ -2,22 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import Final
 
 from .apply import apply_plan
 from .models import FileState, LifecycleJournal, StagedFile, StagedRenderTree
 from .plan import plan_reconcile
 from .ports import TaskQuiescenceScannerPort
+from .recovery import recover_transaction
 from .render import render
 
 
 RECONCILE_INTERFACE_VERSION: Final = 1
 PUBLIC_MODELS: Final = (FileState, LifecycleJournal, StagedFile, StagedRenderTree)
-
-
-def recover_transaction(transaction_id: str, action: str) -> Mapping[str, object]:
-    raise NotImplementedError("reconcile recovery is not implemented yet")
 
 
 __all__ = [
