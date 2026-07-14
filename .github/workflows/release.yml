@@ -52,7 +52,7 @@ jobs:
           path: dist
       - run: uv sync --locked
       - run: uv run python tools/release/build_artifacts.py --verify-existing dist/release-artifact-set.json
-      - name: Publish once and make immutable
+      - name: Publish once under repository immutability
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run python tools/release/publish_release.py --version "${{ inputs.version }}"

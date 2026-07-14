@@ -45,7 +45,8 @@ constraints:
 ```
 
 It selects one exact wheel URL with a SHA-256 fragment. Copy that complete command from
-the immutable `v0.1.0` release.
+the immutable `v0.1.1` release. The mutable `v0.1.0` publication is failed evidence and
+must not be used.
 
 ## 3. First installation
 
@@ -270,7 +271,7 @@ Release only from a clean commit whose final tag points exactly to `HEAD`:
 ```bash
 git status --porcelain
 git rev-parse HEAD
-git rev-list -n 1 v0.1.0
+git rev-list -n 1 v0.1.1
 ```
 
 Required sequence:
@@ -281,14 +282,15 @@ Required sequence:
 4. Generate detached `release-manifest.json` from the actual repository, tag, HEAD, and
    frozen artifact hashes.
 5. Create the GitHub release and upload those exact bytes.
-6. Mark the release immutable.
+6. Confirm repository release immutability was enabled before creation, publish the
+   asset-complete draft, and verify the resulting release reports `immutable: true`.
 7. Re-download every asset and compare hashes.
 8. Run the canonical bootstrap command in a new environment and complete the acceptance
    sequence in Section 4.
 
 Never rebuild after freezing and then reuse old hashes. Never move a published tag or
-replace published assets. If v0.1.0 fails after publication, record it as failed and fix
-the issue under a new v0.1.1 Release Identity.
+replace published assets. `v0.1.0` is already recorded as failed; any failure after the
+`v0.1.1` publication must be fixed under a new `v0.1.2` Release Identity.
 
 ## 14. Evidence to retain
 

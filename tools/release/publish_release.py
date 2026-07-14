@@ -30,13 +30,17 @@ else:
 
 
 class PublicationClient(Protocol):
+    def immutable_releases_enabled(self) -> bool: ...
+
     def create_release_once(self, tag: str, source_commit: str) -> str: ...
 
     def upload_asset_once(self, release_id: str, path: Path) -> None: ...
 
-    def make_release_immutable(self, release_id: str) -> None: ...
+    def publish_release(self, release_id: str) -> None: ...
 
     def fetch_release(self, tag: str) -> Mapping[str, object]: ...
+
+    def resolve_tag_commit(self, tag: str) -> str: ...
 
     def download_asset(self, url: str) -> bytes: ...
 
@@ -216,6 +220,8 @@ def publish_immutable_release(
 ) -> dict[str, object]:
     artifact_set = verify_release_artifact_set(artifact_set_path)
     run_release_gates(artifact_set)
+    if not client.immutable_releases_enabled():
+        raise _failure("repository immutable releases are not enabled")
     manifest = generate_release_manifest(
         artifact_set_path=artifact_set_path,
         version=version,
@@ -232,7 +238,7 @@ def publish_immutable_release(
         _assert_final_bytes(artifact_set_path)
         client.upload_asset_once(release_id, path)
     _assert_final_bytes(artifact_set_path)
-    client.make_release_immutable(release_id)
+    client.publish_release(release_id)
     return verify_published_release(
         client=client,
         tag=tag,
@@ -299,6 +305,10 @@ class GitHubAPIClient:
         self._upload_urls[release_id] = upload_url.split("{", 1)[0]
         return release_id
 
+    def immutable_releases_enabled(self) -> bool:
+        payload = self._request("GET", f"{self.api}/immutable-releases")
+        return isinstance(payload, Mapping) and payload.get("enabled") is True
+
     def upload_asset_once(self, release_id: str, path: Path) -> None:
         upload_url = self._upload_urls.get(release_id)
         if upload_url is None:
@@ -310,11 +320,11 @@ class GitHubAPIClient:
             content_type="application/octet-stream",
         )
 
-    def make_release_immutable(self, release_id: str) -> None:
+    def publish_release(self, release_id: str) -> None:
         self._request(
             "PATCH",
             f"{self.api}/releases/{release_id}",
-            {"draft": False, "immutable": True},
+            {"draft": False},
         )
 
     def fetch_release(self, tag: str) -> Mapping[str, object]:
@@ -322,6 +332,12 @@ class GitHubAPIClient:
         if not isinstance(payload, Mapping):
             raise _failure("GitHub release metadata is invalid")
         return cast(Mapping[str, object], payload)
+
+    def resolve_tag_commit(self, tag: str) -> str:
+        payload = self._request("GET", f"{self.api}/commits/{urllib.parse.quote(tag)}")
+        if not isinstance(payload, Mapping) or not isinstance(payload.get("sha"), str):
+            raise _failure("GitHub tag commit evidence is invalid", tag=tag)
+        return validate_source_commit(str(payload["sha"]))
 
     def download_asset(self, url: str) -> bytes:
         payload = self._request("GET", url, content_type="application/octet-stream")

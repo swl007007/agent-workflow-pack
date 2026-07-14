@@ -36,10 +36,6 @@ def _change_tag(value: dict[str, object]) -> None:
     value["tag_name"] = "v9.9.9"
 
 
-def _change_source(value: dict[str, object]) -> None:
-    value["tag_commit_sha"] = "b" * 40
-
-
 def _make_noncanonical(value: bytes) -> bytes:
     return b"\n" + value
 
@@ -96,7 +92,7 @@ def _release_metadata(manifest_bytes: bytes) -> dict[str, object]:
     return {
         "tag_name": "v0.1.0",
         "immutable": True,
-        "tag_commit_sha": SOURCE_COMMIT,
+        "target_commitish": SOURCE_COMMIT,
         "assets": [
             {
                 "name": "release-manifest.json",
@@ -127,6 +123,7 @@ def _install_fetcher(
     metadata_mutator: Callable[[dict[str, object]], None] | None = None,
     manifest_bytes_mutator: Callable[[bytes], bytes] | None = None,
     api_final_url: str | None = None,
+    tag_commit: str = SOURCE_COMMIT,
 ) -> tuple[ReleaseLocator, PackagedTrustPolicy]:
     import agent_stack.release.trust as trust
 
@@ -147,11 +144,17 @@ def _install_fetcher(
         "https://api.github.com/repos/pinned-owner/agent-workflow-pack/"
         "releases/tags/v0.1.0"
     )
+    commit_url = (
+        "https://api.github.com/repos/pinned-owner/agent-workflow-pack/"
+        "commits/v0.1.0"
+    )
 
     def fetch(url: str, max_bytes: int) -> FetchedContent:
         assert max_bytes > 0
         if url == api_url:
             return FetchedContent(api_final_url or api_url, metadata_bytes)
+        if url == commit_url:
+            return FetchedContent(commit_url, canonical_json_bytes({"sha": tag_commit}))
         if url == MANIFEST_URL:
             return FetchedContent(MANIFEST_URL, manifest_bytes)
         raise AssertionError(f"unexpected fetch URL: {url}")
@@ -208,13 +211,14 @@ def test_manifest_verification_fails_closed(
     metadata_mutator: Callable[[dict[str, object]], None] | None = None
     bytes_mutator: Callable[[bytes], bytes] | None = None
     api_final_url: str | None = None
+    tag_commit = SOURCE_COMMIT
 
     if mutation == "mutable-release":
         metadata_mutator = _make_mutable
     elif mutation == "wrong-tag":
         metadata_mutator = _change_tag
     elif mutation == "wrong-source":
-        metadata_mutator = _change_source
+        tag_commit = "b" * 40
     elif mutation == "wrong-asset-size":
         manifest["assets"]["wheel"]["size"] = 999  # type: ignore[index]
     elif mutation == "wrong-asset-hash":
@@ -234,6 +238,7 @@ def test_manifest_verification_fails_closed(
         metadata_mutator=metadata_mutator,
         manifest_bytes_mutator=bytes_mutator,
         api_final_url=api_final_url,
+        tag_commit=tag_commit,
     )
     if mutation == "wrong-bundle":
         locator = ReleaseLocator(

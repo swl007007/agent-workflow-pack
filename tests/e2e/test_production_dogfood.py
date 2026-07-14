@@ -16,7 +16,7 @@ from tools.release.publish_release import _bundle_roots
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 TAG = f"v{VERSION}"
 REPOSITORY = "swl007007/agent-workflow-pack"
 
@@ -104,7 +104,7 @@ def _transport_boundary(
     manifest_url = f"{asset_base}/release-manifest.json"
     metadata = {
         "tag_name": TAG,
-        "tag_commit_sha": source_commit,
+        "target_commitish": source_commit,
         "immutable": True,
         "assets": [
             {
@@ -128,8 +128,15 @@ def _transport_boundary(
         "https://api.github.com/repos/swl007007/agent-workflow-pack/"
         f"releases/tags/{TAG}"
     )
+    commit_url = (
+        "https://api.github.com/repos/swl007007/agent-workflow-pack/"
+        f"commits/{TAG}"
+    )
     fixture = {
         api_url: base64.b64encode(canonical_json_bytes(metadata)).decode("ascii"),
+        commit_url: base64.b64encode(
+            canonical_json_bytes({"sha": source_commit})
+        ).decode("ascii"),
         manifest_url: base64.b64encode(manifest_bytes).decode("ascii"),
     }
     boundary = tmp_path / "transport-boundary"

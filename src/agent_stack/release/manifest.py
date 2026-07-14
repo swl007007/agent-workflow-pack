@@ -226,7 +226,10 @@ def verify_release_manifest(
         raise _manifest_failure("GitHub release tag does not match the requested version")
     if metadata.get("immutable") is not True:
         raise _manifest_failure("GitHub release is not immutable")
-    source_commit = metadata.get("tag_commit_sha")
+    commit_response = release_trust.fetch_https(derived.tag_commit_url, 2 * 1024 * 1024)
+    validate_https_url(commit_response.final_url, {"api.github.com"})
+    commit_metadata = _parse_json_object(commit_response.body, "GitHub tag commit metadata")
+    source_commit = commit_metadata.get("sha")
     if not isinstance(source_commit, str) or not _COMMIT.fullmatch(source_commit):
         raise _manifest_failure("GitHub release source commit is invalid")
     release_assets = _asset_inventory(metadata)

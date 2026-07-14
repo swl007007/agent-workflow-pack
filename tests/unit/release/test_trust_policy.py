@@ -48,6 +48,9 @@ def test_packaged_policy_derives_the_only_manifest_locator() -> None:
         "https://api.github.com/repos/pinned-owner/agent-workflow-pack/"
         "releases/tags/v0.1.0"
     )
+    assert derived.tag_commit_url == (
+        "https://api.github.com/repos/pinned-owner/agent-workflow-pack/commits/v0.1.0"
+    )
     assert derived.tag == "v0.1.0"
     assert derived.manifest_asset_name == "release-manifest.json"
     assert policy.repository_id == "github.com/pinned-owner/agent-workflow-pack"

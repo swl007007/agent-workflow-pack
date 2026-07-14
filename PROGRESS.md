@@ -1,10 +1,10 @@
 # Production Integration Progress
 
 - Approved plan: `docs/superpowers/plans/2026-07-14-production-composition-release-fix.md`
-- Branch: `fix/rc2-production-composition`
-- Worktree: `/mnt/c/Users/swl00/IFPRI Dropbox/Weilun Shi/Plan/.worktrees/agent-workflow-pack-rc2`
-- Release status: release gate reached and awaiting review; no RC4 or final tag has been created.
-- Execution approval: subsequent implementation waves are pre-approved through the release gate; stop before tagging, pushing, or publishing.
+- Branch: `fix/v0.1.1-immutable-release`
+- Worktree: `/mnt/c/Users/swl00/IFPRI Dropbox/Weilun Shi/Plan/agent-workflow-pack`
+- Release status: `v0.1.0` is preserved as a failed mutable publication; repository immutability is enabled and the `v0.1.1` corrective release is being prepared.
+- Execution approval: continue through immutable publication and post-release acceptance.
 
 ## Completed
 
@@ -39,13 +39,13 @@
 
 ## In Progress
 
-- None. Execution is stopped at the authorized release gate for review.
+- Freeze, tag, publish, and post-release dogfood the corrective `v0.1.1` Release Identity.
 
 ## Remaining
 
-- Release review and explicit authorization for merge/tag/remote/publication actions.
-- Publication remains intentionally deferred.
+- Commit the real GitHub REST tag-resolution and repository-immutability guard.
+- Fast-forward `main`, create and push `v0.1.1`, publish exact frozen assets, re-fetch hashes, and run canonical installed-console dogfood.
 
 ## Resume
 
-Review the release-gate evidence. Do not run Task 8 publication actions without a new explicit instruction.
+Resume from the `v0.1.1` freeze commit; never move or replace `v0.1.0` or its assets.

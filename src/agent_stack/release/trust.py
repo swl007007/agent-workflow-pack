@@ -164,6 +164,7 @@ class PackagedTrustPolicy:
 @dataclass(frozen=True)
 class DerivedManifestLocator:
     api_url: str
+    tag_commit_url: str
     tag: str
     manifest_asset_name: str
 
@@ -179,5 +180,11 @@ def derive_manifest_locator(
     api_url = (
         f"{policy.api_base_url}/repos/{owner}/{repository}/releases/tags/{encoded_tag}"
     )
+    tag_commit_url = (
+        f"{policy.api_base_url}/repos/{owner}/{repository}/commits/{encoded_tag}"
+    )
     validate_https_url(api_url, {"api.github.com"})
-    return DerivedManifestLocator(api_url, tag, policy.manifest_asset_name)
+    validate_https_url(tag_commit_url, {"api.github.com"})
+    return DerivedManifestLocator(
+        api_url, tag_commit_url, tag, policy.manifest_asset_name
+    )

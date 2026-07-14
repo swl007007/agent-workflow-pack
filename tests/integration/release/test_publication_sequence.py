@@ -23,6 +23,10 @@ class FakeGitHub:
         self.immutable = False
         self.mutate_after_create = mutate_after_create
 
+    def immutable_releases_enabled(self) -> bool:
+        self.events.append("check-immutable-policy")
+        return True
+
     def create_release_once(self, tag: str, source_commit: str) -> str:
         self.events.append("create-release")
         self.tag = tag
@@ -38,17 +42,22 @@ class FakeGitHub:
             raise AssertionError("asset replacement attempted")
         self.assets[path.name] = path.read_bytes()
 
-    def make_release_immutable(self, release_id: str) -> None:
+    def publish_release(self, release_id: str) -> None:
         assert release_id == "release-1"
-        self.events.append("make-immutable")
+        self.events.append("publish-release")
         self.immutable = True
+
+    def resolve_tag_commit(self, tag: str) -> str:
+        self.events.append("resolve-tag")
+        assert tag == self.tag
+        return self.source_commit
 
     def fetch_release(self, tag: str) -> dict[str, object]:
         self.events.append("fetch-release")
         assert tag == self.tag
         return {
             "tag_name": self.tag,
-            "tag_commit_sha": self.source_commit,
+            "target_commitish": self.source_commit,
             "immutable": self.immutable,
             "assets": [
                 {
@@ -79,13 +88,15 @@ def test_publication_sequence_uses_final_bytes_once_then_re_fetches_every_asset(
     )
 
     assert result["status"] == "verified"
-    assert client.events[:5] == [
+    assert client.events[:4] == [
+        "check-immutable-policy",
         "create-release",
         f"upload:{artifact_set.wheel.path.name}",
         f"upload:{artifact_set.sdist.path.name}",
-        "upload:release-manifest.json",
-        "make-immutable",
     ]
+    assert "upload:release-manifest.json" in client.events
+    assert "publish-release" in client.events
+    assert client.events.index("publish-release") < client.events.index("resolve-tag")
     assert client.events.count("create-release") == 1
     assert sorted(name for name in client.assets) == sorted(
         [artifact_set.wheel.path.name, artifact_set.sdist.path.name, "release-manifest.json"]
@@ -129,3 +140,45 @@ def test_published_verifier_rejects_non_immutable_or_replaced_assets() -> None:
             source_commit="c" * 40,
             local_assets={path.name: path for path in (artifact_set.wheel.path, artifact_set.sdist.path, manifest)},
         )
+
+
+def test_publication_refuses_to_create_release_without_repository_immutability() -> None:
+    build_release_artifacts(ROOT, ROOT / "dist", rebuild=False)
+    client = FakeGitHub()
+    client.immutable_releases_enabled = lambda: False  # type: ignore[method-assign]
+
+    with pytest.raises(LifecycleFailure, match="repository immutable releases are not enabled"):
+        publish_immutable_release(
+            artifact_set_path=ROOT / "dist/release-artifact-set.json",
+            version="0.1.0",
+            source_commit="276b74ba2c4f7347a9cf01a4c76eea972e90906e",
+            client=client,
+        )
+
+    assert "create-release" not in client.events
+
+
+def test_published_verifier_uses_resolved_remote_tag_commit() -> None:
+    artifact_set = build_release_artifacts(ROOT, ROOT / "dist", rebuild=False)
+    manifest = ROOT / "dist/release-manifest.json"
+    if not manifest.exists():
+        manifest.write_text("{}", encoding="utf-8")
+    client = FakeGitHub()
+    client.tag = "v0.1.0"
+    client.source_commit = "c" * 40
+    client.immutable = True
+    for path in (artifact_set.wheel.path, artifact_set.sdist.path, manifest):
+        client.assets[path.name] = path.read_bytes()
+
+    result = verify_published_release(
+        client=client,
+        tag="v0.1.0",
+        source_commit="c" * 40,
+        local_assets={
+            path.name: path
+            for path in (artifact_set.wheel.path, artifact_set.sdist.path, manifest)
+        },
+    )
+
+    assert result["status"] == "verified"
+    assert "resolve-tag" in client.events

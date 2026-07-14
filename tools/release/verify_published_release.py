@@ -18,6 +18,8 @@ from agent_stack.release.errors import LifecycleFailure
 class PublishedReleaseClient(Protocol):
     def fetch_release(self, tag: str) -> Mapping[str, object]: ...
 
+    def resolve_tag_commit(self, tag: str) -> str: ...
+
     def download_asset(self, url: str) -> bytes: ...
 
 
@@ -40,7 +42,9 @@ def verify_published_release(
     local_assets: Mapping[str, Path],
 ) -> dict[str, object]:
     metadata = client.fetch_release(tag)
-    if metadata.get("tag_name") != tag or metadata.get("tag_commit_sha") != source_commit:
+    if metadata.get("tag_name") != tag:
+        raise _failure("published release identity/source commit changed")
+    if client.resolve_tag_commit(tag) != source_commit:
         raise _failure("published release identity/source commit changed")
     if metadata.get("immutable") is not True:
         raise _failure("published release is not immutable")
