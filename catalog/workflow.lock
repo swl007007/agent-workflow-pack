@@ -1,0 +1,9 @@
+schema_id: agent-workflow.workflow-lock
+schema_version: 1
+components:
+  - id: bundle:production
+    version: 0.1.0
+    source_sha256: 7598a8d9b1198c1c2ed293dc378df6793e347def4197777c015a18fb2f500161
+    content_digest: 7598a8d9b1198c1c2ed293dc378df6793e347def4197777c015a18fb2f500161
+    provider_id: packaged
+    acquisition_id: packaged:production-bundle

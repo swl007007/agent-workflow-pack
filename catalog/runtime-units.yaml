@@ -1,0 +1,45 @@
+schema_id: agent-workflow.runtime-unit-inventory
+schema_version: 1
+units:
+  - unit_id: schema:surface-registry
+    unit_kind: schema
+    distribution_scope: runtime-package
+    normalized_path: schemas/core/runtime-surface-registry.v1.json
+    owning_surface_id: surface-registry
+    leaf_recipe_id: bytes-mode-contract-v1
+    runtime_visible: true
+  - unit_id: module:production-composition
+    unit_kind: module
+    distribution_scope: runtime-package
+    normalized_path: src/agent_stack/reconcile/production_bundle.py
+    owning_surface_id: runtime-control-plane
+    leaf_recipe_id: bytes-mode-contract-v1
+    runtime_visible: true
+  - unit_id: launcher:agent-stack
+    unit_kind: launcher
+    distribution_scope: runtime-package
+    normalized_path: runtime-launcher/agent-stack.sh.tmpl
+    owning_surface_id: runtime-control-plane
+    leaf_recipe_id: bytes-mode-contract-v1
+    runtime_visible: true
+  - unit_id: render-unit:codex-agents
+    unit_kind: render-unit
+    distribution_scope: rendered-project
+    normalized_path: AGENTS.md
+    owning_surface_id: platform-adapter:codex
+    leaf_recipe_id: bytes-mode-contract-v1
+    runtime_visible: true
+  - unit_id: render-unit:codex-skill
+    unit_kind: render-unit
+    distribution_scope: rendered-project
+    normalized_path: .agents/skills/agent-workflow/SKILL.md
+    owning_surface_id: platform-adapter:codex
+    leaf_recipe_id: bytes-mode-contract-v1
+    runtime_visible: true
+  - unit_id: render-unit:codex-wrapper
+    unit_kind: render-unit
+    distribution_scope: rendered-project
+    normalized_path: .agent-workflow/bin/codex-wrapper
+    owning_surface_id: platform-adapter:codex
+    leaf_recipe_id: bytes-mode-contract-v1
+    runtime_visible: true

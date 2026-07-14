@@ -1,0 +1,12 @@
+schema_id: agent-workflow.artifact-definition
+schema_version: 1
+id: codex-wrapper
+source: templates/platforms/codex/codex-wrapper.tmpl
+targets:
+  - path: .agent-workflow/bin/codex-wrapper
+    ownership: managed
+    merge_strategy: whole-file
+    mode_policy: exact
+    mode: "0755"
+forbidden_paths: []
+validators: [{id: utf8-text-v1, version: 1}, {id: newline-v1, version: 1}]

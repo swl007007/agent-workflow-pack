@@ -1,0 +1,21 @@
+schema_id: agent-workflow.catalog
+schema_version: 1
+entries:
+  - id: platform:codex
+    kind: platform
+    dependencies: []
+    conflicts: []
+    references: [router:heavy-development-router]
+    platforms: [codex]
+    required_capabilities: {}
+    mandatory: true
+    discoverable: true
+  - id: router:heavy-development-router
+    kind: router
+    dependencies: []
+    conflicts: []
+    references: []
+    platforms: [codex]
+    required_capabilities: {}
+    mandatory: false
+    discoverable: false

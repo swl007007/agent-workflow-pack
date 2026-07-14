@@ -1,0 +1,24 @@
+schema_id: agent-workflow.runtime-surface-registry
+schema_version: 1
+surfaces:
+  - surface_id: surface-registry
+    surface_kind: surface-registry
+    descriptor_version: 1
+    digest_recipe_id: surface-content-v1
+    owned_unit_ids: [schema:surface-registry]
+    references: []
+    contract_change_class: runtime-visible
+  - surface_id: runtime-control-plane
+    surface_kind: runtime-control-plane
+    descriptor_version: 1
+    digest_recipe_id: surface-content-v1
+    owned_unit_ids: [module:production-composition, launcher:agent-stack]
+    references: [surface-registry]
+    contract_change_class: runtime-visible
+  - surface_id: platform-adapter:codex
+    surface_kind: platform-adapter
+    descriptor_version: 1
+    digest_recipe_id: surface-content-v1
+    owned_unit_ids: [render-unit:codex-agents, render-unit:codex-skill, render-unit:codex-wrapper]
+    references: [runtime-control-plane]
+    contract_change_class: runtime-visible

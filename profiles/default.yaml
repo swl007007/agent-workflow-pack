@@ -1,0 +1,23 @@
+schema_id: agent-workflow.profile
+schema_version: 1
+id: default
+route_admission:
+  default_route: native-light
+  light_owner: native-light
+  heavy_owner: heavy-development-router
+  explicit_only: false
+bindings:
+  native-light: {codex: sol-native}
+  trellis-native: {codex: trellis-implement}
+  speckit-superpowers: {codex: heavy-development-router}
+skills:
+  enable: []
+  disable: []
+artifact_policy: strict
+default_platforms: [codex]
+required_capabilities: {}
+approval_policy:
+  task_creation: required
+  provider_execution: approval-required
+provider_security_policy:
+  initializer: approval-required

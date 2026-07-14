@@ -23,6 +23,8 @@ SUPPORTED_PYTHON_MINORS: Final = ("3.11", "3.12", "3.13", "3.14")
 _DATA_DIRECTORIES: Final = (
     "schemas",
     "catalog",
+    "profiles",
+    "templates",
     "artifact-definitions",
     "overlays",
     "runtime-launcher",
@@ -336,8 +338,50 @@ def _gate(gate_id: str, evidence: object) -> dict[str, object]:
     }
 
 
+def _require_production_integration(root: Path, artifact_set_digest: str) -> dict[str, object]:
+    path = root / "release/production-integration.json"
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise _failure("production integration prerequisite is unavailable") from error
+    expected_fields = {
+        "schema_id",
+        "schema_version",
+        "status",
+        "artifact_set_digest",
+        "installed_wheel_acceptance_digest",
+        "owner_matrix_digest",
+        "first_init_transaction_digest",
+        "launcher_channel_digest",
+    }
+    if not isinstance(document, dict) or set(document) != expected_fields:
+        raise _failure("production integration prerequisite is invalid")
+    if (
+        document.get("schema_id") != "agent-workflow.production-integration"
+        or document.get("schema_version") != 1
+        or document.get("status") != "passed"
+        or document.get("artifact_set_digest") != artifact_set_digest
+    ):
+        raise _failure("production integration prerequisite does not bind final artifacts")
+    for field in expected_fields - {
+        "schema_id",
+        "schema_version",
+        "status",
+        "artifact_set_digest",
+    }:
+        value = document.get(field)
+        if not isinstance(value, str) or len(value) != 64 or any(
+            character not in "0123456789abcdef" for character in value
+        ):
+            raise _failure(
+                "production integration prerequisite digest is invalid", field=field
+            )
+    return document
+
+
 def run_release_gates(artifact_set: ReleaseArtifactSet) -> dict[str, object]:
     root = artifact_set.root
+    _require_production_integration(root, artifact_set.artifact_set_digest)
     SchemaCatalog.discover(root / "schemas")
     if _file_hash(artifact_set.wheel.path) != artifact_set.wheel.sha256 or (
         _file_hash(artifact_set.sdist.path) != artifact_set.sdist.sha256

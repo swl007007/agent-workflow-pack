@@ -1,0 +1,12 @@
+schema_id: agent-workflow.artifact-definition
+schema_version: 1
+id: codex-agents
+source: templates/platforms/codex/AGENTS.md.tmpl
+targets:
+  - path: AGENTS.md
+    ownership: overlay-managed
+    merge_strategy: marked-block
+    mode_policy: preserve
+    markers: {begin: "<!-- agent-workflow:codex:begin -->", end: "<!-- agent-workflow:codex:end -->"}
+forbidden_paths: []
+validators: [{id: utf8-text-v1, version: 1}, {id: newline-v1, version: 1}]

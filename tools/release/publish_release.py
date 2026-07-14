@@ -140,11 +140,11 @@ def _bundle_roots(root: Path) -> dict[str, str]:
     return {
         "trust_policy": policy_digest,
         "workflow_lock": _tree_digest(
-            root, ("catalog",), "agent-workflow.workflow-lock-bundle.v1"
+            root, ("catalog", "profiles"), "agent-workflow.workflow-lock-bundle.v1"
         ),
         "artifact": _tree_digest(
             root,
-            ("artifact-definitions", "overlays"),
+            ("artifact-definitions", "overlays", "templates"),
             "agent-workflow.artifact-bundle.v1",
         ),
         "schema": _tree_digest(root, ("schemas",), "agent-workflow.schema-bundle.v1"),
