@@ -149,6 +149,36 @@ def _manifest_asset_url(
     return url
 
 
+def discover_release_locator(
+    version: str, packaged_policy: PackagedTrustPolicy
+) -> ReleaseLocator:
+    """Pin the detached manifest from immutable GitHub release evidence."""
+
+    provisional = ReleaseLocator(version=version, release_manifest_digest="0" * 64)
+    derived = derive_manifest_locator(provisional, packaged_policy)
+    metadata_response = release_trust.fetch_https(derived.api_url, 2 * 1024 * 1024)
+    validate_https_url(metadata_response.final_url, {"api.github.com"})
+    metadata = _parse_json_object(metadata_response.body, "GitHub release metadata")
+    if metadata.get("tag_name") != derived.tag:
+        raise _manifest_failure("GitHub release tag does not match the requested version")
+    if metadata.get("immutable") is not True:
+        raise _manifest_failure("GitHub release is not immutable")
+    assets = _asset_inventory(metadata)
+    try:
+        manifest_asset = assets[derived.manifest_asset_name]
+    except KeyError as error:
+        raise _manifest_failure("detached manifest asset is missing") from error
+    digest_claim = manifest_asset.get("digest")
+    if not isinstance(digest_claim, str) or not digest_claim.startswith("sha256:"):
+        raise _manifest_failure("detached manifest asset digest is unavailable")
+    return ReleaseLocator(
+        version=version,
+        release_manifest_digest=_sha256(
+            digest_claim.removeprefix("sha256:"), "release_manifest_digest"
+        ),
+    )
+
+
 def _validate_asset(
     kind: str,
     manifest_asset: Mapping[str, object],

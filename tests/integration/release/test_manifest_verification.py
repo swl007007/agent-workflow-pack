@@ -9,7 +9,11 @@ from agent_stack.core.api import canonical_json_bytes
 from agent_stack.release import kernel
 from agent_stack.release.errors import LifecycleFailure
 from agent_stack.release.identity import release_id
-from agent_stack.release.manifest import ReleaseLocator, VerifiedRelease
+from agent_stack.release.manifest import (
+    ReleaseLocator,
+    VerifiedRelease,
+    discover_release_locator,
+)
 from agent_stack.release.trust import FetchedContent, PackagedTrustPolicy
 from tests.unit.release.test_trust_policy import policy_document
 
@@ -169,6 +173,18 @@ def test_verified_manifest_binds_repository_assets_source_and_bundles(
     assert verified.manifest_digest == locator.release_manifest_digest
     assert verified.bundles == _bundles()
     assert verified.assets["wheel"]["sha256"] == "8" * 64
+
+
+def test_immutable_release_metadata_discovers_the_detached_manifest_digest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    expected, policy = _install_fetcher(monkeypatch, _manifest())
+
+    discovered = discover_release_locator(VERSION, policy)
+
+    assert discovered.version == VERSION
+    assert discovered.release_manifest_digest == expected.release_manifest_digest
+    assert discovered.expected_bundles is None
 
 
 @pytest.mark.parametrize(

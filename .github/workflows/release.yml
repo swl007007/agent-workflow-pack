@@ -55,8 +55,8 @@ jobs:
       - name: Publish once and make immutable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run python tools/release/publish_release.py --version "${{ inputs.version }}" --source-commit "$GITHUB_SHA"
+        run: uv run python tools/release/publish_release.py --version "${{ inputs.version }}"
       - name: Re-fetch immutable assets and verify exact hashes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: uv run python tools/release/verify_published_release.py --version "${{ inputs.version }}" --source-commit "$GITHUB_SHA"
+        run: uv run python tools/release/verify_published_release.py --version "${{ inputs.version }}"

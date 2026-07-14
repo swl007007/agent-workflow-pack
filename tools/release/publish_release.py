@@ -7,6 +7,8 @@ import argparse
 import hashlib
 import json
 import os
+import re
+import subprocess
 import sys
 import urllib.parse
 import urllib.request
@@ -48,6 +50,62 @@ def _failure(message: str, **details: object) -> LifecycleFailure:
 def _hash(path: Path) -> str:
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+_PLACEHOLDER_REPOSITORY_TOKENS = ("example", "pinned", "placeholder", "test-owner")
+
+
+def validate_source_commit(source_commit: str) -> str:
+    """Reject malformed and mechanically repeated placeholder commit identities."""
+
+    if _COMMIT.fullmatch(source_commit) is None or len(set(source_commit)) == 1:
+        raise _failure("release source commit is invalid or a placeholder")
+    return source_commit
+
+
+def validate_publication_policy(policy: Mapping[str, object]) -> tuple[str, str]:
+    """Require one concrete GitHub owner/repository publication authority."""
+
+    owner = policy.get("owner")
+    repository = policy.get("repository")
+    if not isinstance(owner, str) or not isinstance(repository, str):
+        raise _failure("publication policy repository identity is invalid")
+    lowered = f"{owner}/{repository}".casefold()
+    if any(token in lowered for token in _PLACEHOLDER_REPOSITORY_TOKENS):
+        raise _failure("publication policy contains a placeholder repository identity")
+    if owner != "swl007007" or repository != "agent-workflow-pack":
+        raise _failure("publication policy differs from the frozen release repository")
+    return owner, repository
+
+
+def _git(root: Path, *arguments: str) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", *arguments],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise _failure("release Git evidence is unavailable", command=list(arguments)) from error
+    return completed.stdout.strip()
+
+
+def release_source_from_git(root: Path, version: str) -> str:
+    """Derive source authority only from a clean HEAD and its exact final tag."""
+
+    if not version or version != version.strip():
+        raise _failure("release version is invalid")
+    source_commit = validate_source_commit(_git(root, "rev-parse", "HEAD"))
+    if _git(root, "status", "--porcelain", "--untracked-files=all"):
+        raise _failure("release worktree must be clean")
+    tag = f"v{version}"
+    tagged_commit = validate_source_commit(_git(root, "rev-parse", f"{tag}^{{commit}}"))
+    if tagged_commit != source_commit:
+        raise _failure("release tag does not identify the current HEAD", tag=tag)
+    return source_commit
 
 
 def _tree_digest(root: Path, relatives: tuple[str, ...], domain: str) -> str:
@@ -109,8 +167,8 @@ def generate_release_manifest(
     run_release_gates(artifact_set)
     root = artifact_set.root
     policy = _trust_policy(root)
-    owner = str(policy["owner"])
-    repository = str(policy["repository"])
+    owner, repository = validate_publication_policy(policy)
+    source_commit = validate_source_commit(source_commit)
     tag = str(policy["tag_template"]).format(version=version)
     logical_release_id = release_id(
         f"github.com/{owner}/{repository}", "agent-workflow-pack", version
@@ -275,16 +333,20 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--artifact-set", type=Path, default=Path("dist/release-artifact-set.json"))
     parser.add_argument("--version", required=True)
-    parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--repository", default="pinned-owner/agent-workflow-pack")
+    parser.add_argument("--repository", default="swl007007/agent-workflow-pack")
     arguments = parser.parse_args()
+    root = Path(__file__).resolve().parents[2]
+    source_commit = release_source_from_git(root, arguments.version)
+    policy_owner, policy_repository = validate_publication_policy(_trust_policy(root))
+    if arguments.repository != f"{policy_owner}/{policy_repository}":
+        raise SystemExit("--repository differs from the packaged trust policy")
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise SystemExit("GITHUB_TOKEN is required")
     result = publish_immutable_release(
         artifact_set_path=arguments.artifact_set,
         version=arguments.version,
-        source_commit=arguments.source_commit,
+        source_commit=source_commit,
         client=GitHubAPIClient(arguments.repository, token),
     )
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))

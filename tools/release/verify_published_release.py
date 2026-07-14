@@ -88,16 +88,18 @@ def verify_published_release(
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--version", required=True)
-    parser.add_argument("--source-commit", required=True)
-    parser.add_argument("--repository", default="pinned-owner/agent-workflow-pack")
+    parser.add_argument("--repository", default="swl007007/agent-workflow-pack")
     parser.add_argument("--dist", type=Path, default=Path("dist"))
     arguments = parser.parse_args()
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-    from tools.release.publish_release import GitHubAPIClient
+    from tools.release.publish_release import GitHubAPIClient, release_source_from_git
 
     token = os.environ.get("GITHUB_TOKEN")
     if not token:
         raise SystemExit("GITHUB_TOKEN is required")
+    source_commit = release_source_from_git(
+        Path(__file__).resolve().parents[2], arguments.version
+    )
     client = GitHubAPIClient(arguments.repository, token)
     assets = {
         path.name: path
@@ -108,7 +110,7 @@ def main() -> int:
     result = verify_published_release(
         client=client,
         tag=f"v{arguments.version}",
-        source_commit=arguments.source_commit,
+        source_commit=source_commit,
         local_assets=assets,
     )
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))

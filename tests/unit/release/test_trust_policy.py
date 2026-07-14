@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -11,6 +12,10 @@ from agent_stack.release.trust import (
     PackagedTrustPolicy,
     derive_manifest_locator,
 )
+from agent_stack._vendor import yaml
+
+
+ROOT = Path(__file__).resolve().parents[3]
 
 
 def policy_document() -> dict[str, object]:
@@ -46,6 +51,17 @@ def test_packaged_policy_derives_the_only_manifest_locator() -> None:
     assert derived.tag == "v0.1.0"
     assert derived.manifest_asset_name == "release-manifest.json"
     assert policy.repository_id == "github.com/pinned-owner/agent-workflow-pack"
+
+
+def test_checked_in_trust_policy_uses_the_real_release_repository() -> None:
+    document = yaml.safe_load(  # type: ignore[no-untyped-call]
+        (ROOT / "release/trust-policy.yaml").read_text(encoding="utf-8")
+    )
+
+    assert isinstance(document, dict)
+    policy = PackagedTrustPolicy.from_document(document)
+    assert policy.owner == "swl007007"
+    assert policy.repository == "agent-workflow-pack"
 
 
 def test_locator_has_no_repository_url_hash_or_trust_override_fields() -> None:
