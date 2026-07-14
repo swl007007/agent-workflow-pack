@@ -134,6 +134,8 @@ class StagedFile:
     mode_policy: str
     candidate_mode: str
     validator_results: tuple[Mapping[str, object], ...] = ()
+    candidate_bytes: bytes = b""
+    neutral_source_bytes: bytes = b""
 
     @classmethod
     def from_document(cls, document: Mapping[str, object]) -> StagedFile:
@@ -157,6 +159,16 @@ class StagedFile:
         results = document.get("validator_results")
         if not isinstance(results, Sequence) or isinstance(results, (str, bytes)):
             raise _failure("StagedFile validator results are invalid")
+        mode_value = document.get("candidate_mode")
+        if mode_value == CANONICAL_NULL:
+            candidate_mode = CANONICAL_NULL
+        elif isinstance(mode_value, (int, str)) and not isinstance(mode_value, bool):
+            try:
+                candidate_mode = normalize_mode(mode_value)
+            except Exception as error:
+                raise _failure("StagedFile mode is invalid") from error
+        else:
+            raise _failure("StagedFile mode is invalid")
         return cls(
             path=normalize_path(str(document.get("path"))),
             definition_id=str(document.get("definition_id")),
@@ -169,7 +181,7 @@ class StagedFile:
                 document.get("candidate_byte_hash"), "candidate_byte_hash"
             ),
             mode_policy=str(document.get("mode_policy")),
-            candidate_mode=normalize_mode(document.get("candidate_mode")),  # type: ignore[arg-type]
+            candidate_mode=candidate_mode,
             validator_results=tuple(
                 MappingProxyType(dict(_mapping(value, "validator_result")))
                 for value in results
@@ -181,6 +193,8 @@ class StagedFile:
 class StagedRenderTree:
     files: tuple[StagedFile, ...]
     content_root_digest: str
+    launcher_bundle_digest: str = ""
+    distribution_render_digest: str = ""
 
 
 @dataclass(frozen=True)

@@ -2,25 +2,17 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Final
 
 from agent_stack.core.api import DesiredStateIR, SavedPlanEnvelope, TaskSnapshotAndFindings
-from agent_stack.providers.api import ProviderExecutionResult
-
 from .models import FileState, LifecycleJournal, StagedFile, StagedRenderTree
 from .ports import TaskQuiescenceScannerPort
+from .render import render
 
 
 RECONCILE_INTERFACE_VERSION: Final = 1
 PUBLIC_MODELS: Final = (FileState, LifecycleJournal, StagedFile, StagedRenderTree)
-
-
-def render(
-    ir: DesiredStateIR,
-    verified_provider_results: Sequence[ProviderExecutionResult],
-) -> StagedRenderTree:
-    raise NotImplementedError("deterministic renderer is not implemented yet")
 
 
 def plan_reconcile(

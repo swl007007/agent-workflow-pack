@@ -15,7 +15,7 @@
     "merge_strategy": {"enum": ["whole-file", "marked-block", "observe-baseline", "none"]},
     "source_digest": {"$ref": "#/definitions/sha256"}, "render_digest": {"$ref": "#/definitions/sha256"},
     "candidate_byte_hash": {"$ref": "#/definitions/sha256"}, "mode_policy": {"enum": ["exact", "preserve"]},
-    "candidate_mode": {"type": "string", "pattern": "^0[0-7]{3}$"},
+    "candidate_mode": {"oneOf": [{"type": "string", "pattern": "^0[0-7]{3}$"}, {"const": "canonical-null"}]},
     "validator_results": {"type": "array", "items": {"type": "object"}}
   },
   "definitions": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}

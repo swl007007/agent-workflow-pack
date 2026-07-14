@@ -80,3 +80,19 @@ def test_file_state_binds_type_bytes_mode_and_non_symlink() -> None:
     assert state.byte_hash == "a" * 64
     assert state.mode == "0644"
     assert state.non_symlink is True
+
+
+def test_staged_file_accepts_preserved_mode_sentinel() -> None:
+    from agent_stack.reconcile.models import StagedFile
+
+    staged = StagedFile.from_document(
+        {
+            **_staged_file(),
+            "ownership": "overlay-managed",
+            "merge_strategy": "marked-block",
+            "mode_policy": "preserve",
+            "candidate_mode": "canonical-null",
+        }
+    )
+
+    assert staged.candidate_mode == "canonical-null"
