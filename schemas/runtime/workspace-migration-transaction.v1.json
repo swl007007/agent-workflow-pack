@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.workspace-migration-transaction",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-4",
+  "x-implementation-owner": "task-4",
+  "x-digest-domains": ["agent-workflow.workspace-migration-binding.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "immutable_header",
+    "journal_binding_digest",
+    "phase",
+    "rollback_state"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.workspace-migration-transaction"},
+    "schema_version": {"const": 1},
+    "immutable_header": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transaction_id",
+        "operation",
+        "project_id",
+        "workspace_instance_id",
+        "source_contract",
+        "target_contract",
+        "compatibility_edge",
+        "target_manifest_identity",
+        "source_layout",
+        "target_layout",
+        "source_schemas",
+        "target_schemas",
+        "task_snapshot",
+        "task_findings",
+        "task_quiescence_digest",
+        "workspace_state_evaluation",
+        "task_gate_evaluation",
+        "workspace_diagnostic",
+        "file_records",
+        "recovery_runtime"
+      ],
+      "properties": {
+        "transaction_id": {"$ref": "#/definitions/uuid"},
+        "operation": {"const": "workspace-migrate"},
+        "project_id": {"$ref": "#/definitions/uuid"},
+        "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+        "source_contract": {"type": "object"},
+        "target_contract": {"type": "object"},
+        "compatibility_edge": {"type": "object"},
+        "target_manifest_identity": {"type": "object"},
+        "source_layout": {"type": "object"},
+        "target_layout": {"type": "object"},
+        "source_schemas": {"type": "object"},
+        "target_schemas": {"type": "object"},
+        "task_snapshot": {"type": "object"},
+        "task_findings": {"type": "object"},
+        "task_quiescence_digest": {"$ref": "#/definitions/sha256"},
+        "workspace_state_evaluation": {"type": "object"},
+        "task_gate_evaluation": {"type": "object"},
+        "workspace_diagnostic": {"type": "object"},
+        "file_records": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "kind",
+              "preimage_state",
+              "candidate_state",
+              "preimage_document",
+              "candidate_document"
+            ],
+            "properties": {
+              "path": {"type": "string", "minLength": 1},
+              "kind": {"enum": ["approval-replay", "task-outbox", "workspace"]},
+              "preimage_state": {"type": "object"},
+              "candidate_state": {"type": "object"},
+              "preimage_document": {"type": "object"},
+              "candidate_document": {"type": "object"}
+            }
+          }
+        },
+        "recovery_runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["runtime_role", "release_id", "release_manifest_digest"],
+          "properties": {
+            "runtime_role": {"enum": ["committed", "candidate"]},
+            "release_id": {"$ref": "#/definitions/sha256"},
+            "release_manifest_digest": {"$ref": "#/definitions/sha256"}
+          }
+        }
+      }
+    },
+    "journal_binding_digest": {"$ref": "#/definitions/sha256"},
+    "phase": {
+      "enum": [
+        "planned",
+        "local_candidates_applied",
+        "workspace_committed",
+        "cleanup_pending",
+        "complete"
+      ]
+    },
+    "rollback_state": {"type": "object"}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}
