@@ -4,12 +4,13 @@
 - Worktree: `/tmp/awp-v015-canonical-first-install`
 - Approved design: `docs/superpowers/specs/2026-07-14-v015-canonical-first-install-design.md`
 - Implementation plan: `docs/superpowers/plans/2026-07-14-v015-canonical-first-install.md`
-- Current task: modern uv/uvx version parsing and release re-freeze
+- Current task: completed; v0.1.8 accepted after immutable postpublication dogfood
 - Baseline: focused publication/workflow tests passed at `9398465`
 - Release rule: no manual publication fallback; postpublication failure freezes `v0.1.8` and advances to `v0.1.9`.
-- Completed: v0.1.7 immutable failure diagnosis and RED/GREEN coverage for modern uv/uvx platform-suffixed version output.
+- Completed: v0.1.7 immutable failure diagnosis, modern uv/uvx parser fix, v0.1.8 immutable publication, asset re-verification, and durable-handoff dogfood.
 - Focused verification: launcher/release suite passed (19 tests); installed-wheel production dogfood passed.
 - Full verification: Ruff passed; mypy passed; 707 tests passed; 15/15 prepublication gates passed.
+- Postpublication verification: workflow `29377537295` passed; canonical command digest `f0e5fd2cbe7d3074e66f1a6ff1927092a7d9663671dca298ba8af13283711bce`.
 - Frozen candidate artifact set: `26082fcd30226667e49d6faf0dddef94f45c9db383034b2c06d5cd5e142db76a`.
 - Wheel: `db85f06beff3a3188146e5234dd8e77022586259dd769adda1ba53ecc43a71da`.
 - sdist: `491e38443b0e340ab95ae4a792dfb72adaeef0ed24fd02c30637aa74c2e10614`.

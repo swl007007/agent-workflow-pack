@@ -45,8 +45,8 @@ constraints:
 ```
 
 It selects one exact wheel URL with a SHA-256 fragment. Copy that complete command only
-from an accepted immutable release. The `v0.1.0` through `v0.1.7` publications or candidates are failed
-evidence and must not be used; no accepted release currently exists.
+from the accepted immutable `v0.1.8` release. The `v0.1.0` through `v0.1.7`
+publications or candidates are failed evidence and must not be used.
 
 ## 3. First installation
 

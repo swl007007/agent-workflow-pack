@@ -13,8 +13,7 @@ verification, and review; its planner and executor are not automatically exposed
 
 ## Release status
 
-**v0.1.7 is an immutable failed release and must not be used. No accepted release is
-currently available.**
+**v0.1.8 is the first accepted immutable release.**
 
 Versions `0.1.0` through `0.1.7` are retained as failed publications or candidates. Their tags, release
 metadata, and assets must not be moved, replaced, or treated as installation authorities.
