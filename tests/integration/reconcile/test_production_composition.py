@@ -33,7 +33,13 @@ def _verified_release() -> VerifiedRelease:
             "compatibility": "6" * 64,
             "launcher": "7" * 64,
         },
-        assets={},
+        assets={
+            "wheel": {
+                "url": "https://github.com/swl007007/agent-workflow-pack/releases/download/v0.1.0/agent_workflow_pack-0.1.0-py3-none-any.whl",
+                "sha256": "8" * 64,
+                "size": 1,
+            }
+        },
         immutable_release=True,
     )
 
@@ -118,6 +124,9 @@ def test_init_apply_uses_real_bundle_and_commits_complete_project_contract(
     )
     assert (project / ".agents/skills/agent-workflow/SKILL.md").is_file()
     assert (project / ".agent-workflow/bin/codex-wrapper").is_file()
+    assert (project / ".agent-workflow/bin/agent-stack").is_file()
+    assert (project / ".agent-workflow/runtime-control.json").is_file()
+    assert (project / ".agent-workflow/workflow.lock").is_file()
     assert (project / ".agent-workflow/manifest.json").is_file()
     assert (project / ".agent-workflow/local/workspace.json").is_file()
     assert (project / ".agent-workflow/local/approval-replay.json").is_file()

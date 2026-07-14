@@ -13,6 +13,13 @@ from .errors import RendererFailure
 from .models import FileState, StagedFile, StagedRenderTree
 
 
+_RECONCILER_CONTROL_TARGETS = {
+    "project-launcher": (".agent-workflow/bin/agent-stack", "0755"),
+    "runtime-control": (".agent-workflow/runtime-control.json", "0644"),
+    "project-workflow-lock": (".agent-workflow/workflow.lock", "0644"),
+}
+
+
 @dataclass(frozen=True)
 class OwnershipPlan:
     decisions: tuple[Mapping[str, object], ...]
@@ -224,6 +231,34 @@ def plan_ownership(
     targets = _definitions(artifact_definitions)
     previous = _manifest_records(manifest_files)
     staged_by_path = {record.path: record for record in staged_tree.files}
+    for definition_id, (path, mode) in _RECONCILER_CONTROL_TARGETS.items():
+        record = staged_by_path.get(path)
+        if record is None:
+            continue
+        if (
+            record.definition_id != definition_id
+            or record.surface_id != "runtime-control-plane"
+            or record.ownership != "managed"
+            or record.merge_strategy != "whole-file"
+            or record.mode_policy != "exact"
+            or record.candidate_mode != mode
+        ):
+            raise _failure(
+                "AWP_OWNERSHIP_CONFLICT",
+                "Reconciler control target contract differs",
+                path=path,
+            )
+        targets[path] = MappingProxyType(
+            {
+                "path": path,
+                "definition_id": definition_id,
+                "ownership": "managed",
+                "merge_strategy": "whole-file",
+                "mode_policy": "exact",
+                "mode": mode,
+                "markers": None,
+            }
+        )
     all_paths = sorted(set(staged_by_path) | set(previous))
     if set(observed_files) != set(all_paths):
         raise _failure(

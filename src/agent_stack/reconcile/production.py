@@ -11,6 +11,7 @@ from types import MappingProxyType
 from agent_stack.cli.production import ProductionCommand
 from agent_stack.core.api import (
     CANONICAL_NULL,
+    DesiredStateIR,
     ResolverInputs,
     TaskSnapshotAndFindings,
     canonical_json_bytes,
@@ -21,10 +22,11 @@ from agent_stack.providers.api import ProviderExecutionResult
 from agent_stack.providers.archive import content_root_digest
 from agent_stack.release.manifest import VerifiedRelease
 from agent_stack.runtime.scanner import NormativeTaskScanner
+from agent_stack.runtime.bootstrap import launcher_contract_from_release
 
 from .api import apply_plan, plan_reconcile, render
 from .cas import observe_file_state
-from .models import StagedRenderTree
+from .models import StagedFile, StagedRenderTree
 from .production_bundle import ProductionBundle, load_production_bundle
 
 
@@ -140,6 +142,106 @@ def _render_units(
     return tuple(units)
 
 
+def _control_record(
+    definition_id: str,
+    path: str,
+    mode: str,
+    candidate: bytes,
+    neutral: bytes,
+) -> StagedFile:
+    candidate_hash = hashlib.sha256(candidate).hexdigest()
+    return StagedFile(
+        path=path,
+        definition_id=definition_id,
+        surface_id="runtime-control-plane",
+        ownership="managed",
+        merge_strategy="whole-file",
+        source_digest=hashlib.sha256(neutral).hexdigest(),
+        render_digest=digest(
+            "agent-workflow.rendered-file.v1",
+            {
+                "path": path,
+                "definition_id": definition_id,
+                "surface_id": "runtime-control-plane",
+                "source_digest": hashlib.sha256(neutral).hexdigest(),
+                "candidate_byte_hash": candidate_hash,
+                "candidate_mode": mode,
+                "renderer_version": 1,
+                "validator_ids": ["utf8-text-v1"],
+            },
+        ),
+        candidate_byte_hash=candidate_hash,
+        mode_policy="exact",
+        candidate_mode=mode,
+        validator_results=(),
+        candidate_bytes=candidate,
+        neutral_source_bytes=neutral,
+    )
+
+
+def _with_control_artifacts(
+    ir: DesiredStateIR,
+    staged: StagedRenderTree,
+    release: VerifiedRelease,
+    data_root: Path,
+    bundle: ProductionBundle,
+) -> StagedRenderTree:
+    contract = launcher_contract_from_release(release)
+    launcher_template = (data_root / "runtime-launcher/agent-stack.sh.tmpl").read_bytes()
+    launcher = contract.render(launcher_template)
+    control_template = (data_root / "templates/control/runtime-control.json.tmpl").read_bytes()
+    control = canonical_json_bytes(contract.runtime_control(launcher))
+    lock_source = (data_root / "catalog/workflow.lock").read_bytes()
+    lock_candidate = canonical_json_bytes(bundle.workflow_lock)
+    records = tuple(
+        sorted(
+            (
+                *staged.files,
+                _control_record(
+                    "project-launcher",
+                    ".agent-workflow/bin/agent-stack",
+                    "0755",
+                    launcher,
+                    launcher_template,
+                ),
+                _control_record(
+                    "runtime-control",
+                    ".agent-workflow/runtime-control.json",
+                    "0644",
+                    control,
+                    control_template,
+                ),
+                _control_record(
+                    "project-workflow-lock",
+                    ".agent-workflow/workflow.lock",
+                    "0644",
+                    lock_candidate,
+                    lock_source,
+                ),
+            ),
+            key=lambda record: record.path,
+        )
+    )
+    projection = [
+        {
+            "path": record.path,
+            "candidate_byte_hash": record.candidate_byte_hash,
+            "candidate_mode": record.candidate_mode,
+            "render_digest": record.render_digest,
+        }
+        for record in records
+    ]
+    return StagedRenderTree(
+        files=records,
+        content_root_digest=digest("agent-workflow.staged-render-tree.v1", projection),
+        launcher_bundle_digest=staged.launcher_bundle_digest,
+        distribution_render_digest=digest(
+            "agent-workflow.distribution-render.v1",
+            {"release_contract": dict(ir.release_contract), "files": projection},
+        ),
+    )
+
+
 def _provider_result(data_root: Path) -> ProviderExecutionResult:
     return ProviderExecutionResult.without_approval(
         provider_plan_digest="0" * 64,
@@ -207,7 +309,13 @@ def compose_init(
             "init", release, bundle, task_state, render_units=units
         )
     )
-    staged = render(ir, (_provider_result(data_root),))
+    staged = _with_control_artifacts(
+        ir,
+        render(ir, (_provider_result(data_root),)),
+        release,
+        data_root,
+        bundle,
+    )
     project_id = str(uuid.uuid4())
     workspace_id = str(uuid.uuid4())
     replay = {

@@ -26,6 +26,7 @@ REQUIRED_PRODUCTION_INPUTS = (
     "artifact-definitions/platforms/codex-agents.yaml",
     "artifact-definitions/platforms/codex-skill.yaml",
     "artifact-definitions/platforms/codex-wrapper.yaml",
+    "templates/control/runtime-control.json.tmpl",
 )
 
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -110,6 +111,39 @@ def test_ownership_schemas_are_registered_and_closed() -> None:
     catalog = SchemaCatalog.discover(ROOT / "schemas")
     assert catalog.supported_versions("agent-workflow.ownership-decision") == (1,)
     assert catalog.supported_versions("agent-workflow.ownership-observation") == (1,)
+
+
+def test_reconciler_control_authority_is_an_exact_closed_allowlist() -> None:
+    launcher = replace(
+        staged(
+            ".agent-workflow/bin/agent-stack",
+            b"#!/bin/sh\n",
+            definition_id="project-launcher",
+            candidate_mode="0755",
+        ),
+        surface_id="runtime-control-plane",
+    )
+    observed = {
+        launcher.path: {"state": state(launcher.path, None), "content": None}
+    }
+
+    plan = plan_ownership(
+        StagedRenderTree((launcher,), "3" * 64),
+        (),
+        (),
+        observed,
+        operation="init",
+    )
+
+    assert plan.candidate_file_states[0].path == launcher.path
+    with pytest.raises(Exception, match="AWP_OWNERSHIP_CONFLICT"):
+        plan_ownership(
+            StagedRenderTree((replace(launcher, candidate_mode="0644"),), "3" * 64),
+            (),
+            (),
+            observed,
+            operation="init",
+        )
 
 
 def test_managed_create_replace_enrollment_and_retirement() -> None:
