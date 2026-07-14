@@ -137,9 +137,20 @@ def _sorted_mappings(
 
 def _validate_release_contract(value: Mapping[str, object]) -> Mapping[str, object]:
     release = _json_mapping(value, "release contract")
-    if set(release) != {"release_id", "release_manifest_digest"}:
+    expected = {
+        "release_id",
+        "release_manifest_digest",
+        "release_trust_policy_id",
+        "release_trust_policy_digest",
+        "version",
+    }
+    if set(release) != expected:
         raise _failure("release contract fields are not closed")
-    for field in ("release_id", "release_manifest_digest"):
+    for field in (
+        "release_id",
+        "release_manifest_digest",
+        "release_trust_policy_digest",
+    ):
         candidate = release.get(field)
         if (
             not isinstance(candidate, str)
@@ -147,6 +158,10 @@ def _validate_release_contract(value: Mapping[str, object]) -> Mapping[str, obje
             or any(character not in "0123456789abcdef" for character in candidate)
         ):
             raise _failure("release contract digest is invalid", field=field)
+    for field in ("release_trust_policy_id", "version"):
+        candidate = release.get(field)
+        if not isinstance(candidate, str) or not candidate or candidate != candidate.strip():
+            raise _failure("release contract string is invalid", field=field)
     return release
 
 

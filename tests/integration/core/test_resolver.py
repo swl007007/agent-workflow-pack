@@ -43,7 +43,13 @@ def _inputs() -> ResolverInputs:
     task_snapshot, task_findings = _snapshot()
     return ResolverInputs(
         operation="init",
-        release_contract={"release_id": "1" * 64, "release_manifest_digest": "2" * 64},
+        release_contract={
+            "release_id": "1" * 64,
+            "release_manifest_digest": "2" * 64,
+            "release_trust_policy_id": "github-immutable-release-v1",
+            "release_trust_policy_digest": "3" * 64,
+            "version": "0.1.0",
+        },
         profile_sources=(
             _profile(
                 "base",
@@ -85,6 +91,10 @@ def test_resolver_composes_validated_modules_into_stable_ir() -> None:
 
     assert first.desired_state_ir_digest == second.desired_state_ir_digest
     assert first.operation == "init"
+    assert first.release_contract["version"] == "0.1.0"
+    assert first.release_contract["release_trust_policy_id"] == (
+        "github-immutable-release-v1"
+    )
     assert first.selected_platforms == ("codex",)
     assert first.catalog_closure == ("platform:codex", "skill:tdd")
     assert first.candidate_impact.impact_kind == "runtime-visible"
