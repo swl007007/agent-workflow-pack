@@ -5,16 +5,17 @@ from __future__ import annotations
 from typing import Final
 
 from .identity import ReleaseIdentity, release_id
+from .manifest import ReleaseLocator, VerifiedRelease, verify_release_manifest
+from .trust import PackagedTrustPolicy
 
 
 RELEASE_KERNEL_INTERFACE_VERSION: Final = 1
-PUBLIC_MODELS: Final = (ReleaseIdentity,)
-
-
-def verify_release_manifest(locator: object, packaged_policy: object) -> object:
-    """Verify one detached immutable release; implemented by release-kernel Task 2."""
-
-    raise NotImplementedError("detached release verification is not implemented yet")
+PUBLIC_MODELS: Final = (
+    PackagedTrustPolicy,
+    ReleaseIdentity,
+    ReleaseLocator,
+    VerifiedRelease,
+)
 
 
 def classify_compatibility(
@@ -35,8 +36,11 @@ def select_candidate_runtime(
 
 __all__ = [
     "PUBLIC_MODELS",
+    "PackagedTrustPolicy",
     "RELEASE_KERNEL_INTERFACE_VERSION",
     "ReleaseIdentity",
+    "ReleaseLocator",
+    "VerifiedRelease",
     "classify_compatibility",
     "release_id",
     "select_candidate_runtime",

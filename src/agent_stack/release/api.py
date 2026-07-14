@@ -3,8 +3,11 @@
 from .errors import LifecycleFailure
 from .kernel import (
     PUBLIC_MODELS,
+    PackagedTrustPolicy,
     RELEASE_KERNEL_INTERFACE_VERSION,
     ReleaseIdentity,
+    ReleaseLocator,
+    VerifiedRelease,
     classify_compatibility,
     release_id,
     select_candidate_runtime,
@@ -14,8 +17,11 @@ from .kernel import (
 __all__ = [
     "LifecycleFailure",
     "PUBLIC_MODELS",
+    "PackagedTrustPolicy",
     "RELEASE_KERNEL_INTERFACE_VERSION",
     "ReleaseIdentity",
+    "ReleaseLocator",
+    "VerifiedRelease",
     "classify_compatibility",
     "release_id",
     "select_candidate_runtime",

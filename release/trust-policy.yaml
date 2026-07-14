@@ -1,0 +1,14 @@
+schema_id: agent-workflow.release-trust-policy
+schema_version: 1
+policy_id: github-immutable-release-v1
+host: github.com
+owner: pinned-owner
+repository: agent-workflow-pack
+tag_template: "v{version}"
+manifest_asset_name: release-manifest.json
+api_base_url: https://api.github.com
+allowed_redirect_hosts:
+  - github.com
+  - objects.githubusercontent.com
+immutable_release_required: true
+policy_digest: c80032b39c6e479d311668d9e38834d8647a2f0ca919d4f33924d0527d3bc721
