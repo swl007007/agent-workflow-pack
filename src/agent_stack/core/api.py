@@ -25,7 +25,13 @@ from .diagnostics import WorkspaceDiagnostic, build_workspace_diagnostic
 from .errors import CoreFailure
 from .impact import CandidateImpact, compute_candidate_impact
 from .profile import resolve_profile
-from .resolver import DesiredStateIR, ResolverInputs, resolve
+from .resolver import (
+    DesiredStateIR,
+    ResolverInputs,
+    compute_artifact_bundle_digest,
+    compute_workflow_lock_digest,
+    resolve,
+)
 from .saved_plan import (
     SavedPlanEnvelope,
     compute_candidate_manifest_digest,
@@ -76,11 +82,13 @@ __all__ = [
     "build_workspace_diagnostic",
     "canonical_json_bytes",
     "compute_candidate_impact",
+    "compute_artifact_bundle_digest",
     "compute_candidate_manifest_digest",
     "compute_journal_binding_digest",
     "compute_plan_core_digest",
     "compute_plan_digest",
     "compute_surface_digests",
+    "compute_workflow_lock_digest",
     "derive_protected_paths",
     "digest",
     "evaluate_capabilities",

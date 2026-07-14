@@ -245,6 +245,26 @@ def _artifact_projection(definitions: Sequence[Any]) -> tuple[Mapping[str, objec
     return tuple(sorted(result, key=lambda item: str(item["id"])))
 
 
+def compute_workflow_lock_digest(document: Mapping[str, object]) -> str:
+    """Return the exact Resolver authority digest for one workflow lock."""
+
+    return digest(
+        "agent-workflow.workflow-lock.v1",
+        _workflow_lock_projection(normalize_workflow_lock(document)),
+    )
+
+
+def compute_artifact_bundle_digest(
+    documents: Sequence[Mapping[str, object]],
+) -> str:
+    """Return the exact Resolver authority digest for artifact definitions."""
+
+    return digest(
+        "agent-workflow.artifact-bundle.v1",
+        list(_artifact_projection(validate_artifact_definitions(documents))),
+    )
+
+
 def _gate_blocker_exit(code: str) -> int:
     if code == "AWP_WORKSPACE_TASK_RECOVERY_BLOCK":
         return 21

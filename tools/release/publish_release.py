@@ -133,20 +133,21 @@ def _trust_policy(root: Path) -> Mapping[str, object]:
 
 
 def _bundle_roots(root: Path) -> dict[str, str]:
+    from agent_stack.core.api import (
+        compute_artifact_bundle_digest,
+        compute_workflow_lock_digest,
+    )
+    from agent_stack.reconcile.production_bundle import load_production_bundle
+
     policy = _trust_policy(root)
     policy_digest = policy.get("policy_digest")
     if not isinstance(policy_digest, str):
         raise _failure("packaged trust policy digest is missing")
+    bundle = load_production_bundle(root)
     return {
         "trust_policy": policy_digest,
-        "workflow_lock": _tree_digest(
-            root, ("catalog", "profiles"), "agent-workflow.workflow-lock-bundle.v1"
-        ),
-        "artifact": _tree_digest(
-            root,
-            ("artifact-definitions", "overlays", "templates"),
-            "agent-workflow.artifact-bundle.v1",
-        ),
+        "workflow_lock": compute_workflow_lock_digest(bundle.workflow_lock),
+        "artifact": compute_artifact_bundle_digest(bundle.artifact_definitions),
         "schema": _tree_digest(root, ("schemas",), "agent-workflow.schema-bundle.v1"),
         "migration": _tree_digest(
             root, ("compatibility",), "agent-workflow.migration-bundle.v1"

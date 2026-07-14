@@ -25,7 +25,10 @@
 - Production `workspace migrate` now reconstructs source identity/contract/layout from canonical clone-local state, verifies an exact target-owned compatibility edge, scans source/target task state, and calls the real migration transaction.
 - Production `recover --workspace-registration` now selects one exact journal and invokes the real registration recovery transaction after project/caller authority verification.
 - Production `recover --workspace-migration` reconstructs the exact recorded layout/schema scanner context and resumes the real migration journal; a crash after local candidates is covered.
+- Release publication now computes workflow-lock and artifact-bundle roots through the exact Core Resolver projections, closing a cross-layer authority mismatch that would have made a published init fail later runtime verification.
+- Installed-console expectations now distinguish release-independent `test-routing` from unpublished release-dependent `doctor`/`sync`, which correctly fail at `AWP_RELEASE_MANIFEST_INVALID` with zero writes.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
+- Focused release-authority and console verification: 9 tests passed; Ruff and mypy passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
 ## In Progress
@@ -42,4 +45,4 @@
 
 ## Resume
 
-Bind lifecycle recovery/upgrade using exact release journals, then add the deterministic immutable-network installed-wheel console chain. Existing unpublished doctor/sync expectations need correction because release-dependent commands correctly fail at the supply-chain gate.
+Bind lifecycle recovery/upgrade using exact release journals, then add the deterministic immutable-network installed-wheel console chain.

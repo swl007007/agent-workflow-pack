@@ -80,15 +80,14 @@ def test_unpublished_installed_console_reaches_release_gate_without_project_writ
     assert sorted(project.iterdir()) == []
 
 
-@pytest.mark.parametrize("command", ["doctor", "test-routing"])
-def test_installed_console_read_only_commands_use_production_owners(
-    tmp_path: Path, installed_console: Path, command: str
+def test_installed_console_test_routing_uses_production_owner_without_release_fetch(
+    tmp_path: Path, installed_console: Path
 ) -> None:
-    project = tmp_path / command
+    project = tmp_path / "test-routing"
     project.mkdir()
 
     completed = subprocess.run(
-        [installed_console, command, "--json"],
+        [installed_console, "test-routing", "--json"],
         cwd=project,
         check=False,
         capture_output=True,
@@ -104,8 +103,8 @@ def test_installed_console_read_only_commands_use_production_owners(
     )
 
 
-@pytest.mark.parametrize("command", [["sync", "--dry-run"]])
-def test_installed_console_dry_runs_use_production_owners_without_writes(
+@pytest.mark.parametrize("command", [["doctor"], ["sync", "--dry-run"]])
+def test_unpublished_release_dependent_commands_fail_closed_without_writes(
     tmp_path: Path, installed_console: Path, command: list[str]
 ) -> None:
     project = tmp_path / command[0]
@@ -122,7 +121,8 @@ def test_installed_console_dry_runs_use_production_owners_without_writes(
     )
     document = json.loads(completed.stdout)
 
-    assert completed.returncode == 0, document
-    assert document["status"] == "success"
+    assert completed.returncode == 30, document
+    assert document["status"] == "error"
+    assert document["errors"][0]["code"] == "AWP_RELEASE_MANIFEST_INVALID"
     assert sentinel.read_text(encoding="utf-8") == "preserve me\n"
     assert sorted(path.name for path in project.iterdir()) == ["user.txt"]
