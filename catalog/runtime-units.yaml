@@ -4,21 +4,21 @@ units:
   - unit_id: schema:surface-registry
     unit_kind: schema
     distribution_scope: runtime-package
-    normalized_path: schemas/core/runtime-surface-registry.v1.json
+    normalized_path: data/schemas/core/runtime-surface-registry.v1.json
     owning_surface_id: surface-registry
     leaf_recipe_id: bytes-mode-contract-v1
     runtime_visible: true
   - unit_id: module:production-composition
     unit_kind: module
     distribution_scope: runtime-package
-    normalized_path: src/agent_stack/reconcile/production_bundle.py
+    normalized_path: reconcile/production_bundle.py
     owning_surface_id: runtime-control-plane
     leaf_recipe_id: bytes-mode-contract-v1
     runtime_visible: true
   - unit_id: launcher:agent-stack
     unit_kind: launcher
     distribution_scope: runtime-package
-    normalized_path: runtime-launcher/agent-stack.sh.tmpl
+    normalized_path: data/runtime-launcher/agent-stack.sh.tmpl
     owning_surface_id: runtime-control-plane
     leaf_recipe_id: bytes-mode-contract-v1
     runtime_visible: true

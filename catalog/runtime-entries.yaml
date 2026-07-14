@@ -1,0 +1,9 @@
+schema_id: agent-workflow.runtime-entry-registry
+schema_version: 1
+entries:
+  - entry_id: codex-wrapper
+    owning_surface_id: platform-adapter:codex
+    allowed_modes: [trellis-native, speckit-superpowers]
+    allowed_lifecycle_statuses: [active, blocked, completed]
+    allowed_phases: []
+    claim_policy: optional

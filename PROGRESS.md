@@ -20,6 +20,8 @@
 - Verified launcher caller fields reach `ProductionCommand`; doctor now performs real read-only project authority reconstruction in the current increment.
 - Production `workspace register` now verifies committed runtime authority and launcher caller context, loads the packaged Trellis layout, and commits the real workspace/replay pair for a fresh clone.
 - Production heavy-task claim/release now load canonical integration state, verify project/caller authority, and call the real Task-state Service with generated transaction identities.
+- Production task transition/archive/recovery and existing-task runtime load now call the real domain services; the runtime inventory uses installed-package paths and a packaged runtime-entry registry.
+- Public `task admit` now establishes project/caller authority and fails specifically at the absent platform-authenticated Decision/proof boundary instead of a fixed Runtime placeholder; it does not manufacture approval.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
@@ -37,4 +39,4 @@
 
 ## Resume
 
-Add production task transition/recovery RED over canonical integration/journal state, then bind runtime-load/admission/archive before returning to workspace/lifecycle migration and recovery.
+Bind workspace migration/recovery and lifecycle recovery using verified source/candidate evidence, then close the installed-wheel console chain.

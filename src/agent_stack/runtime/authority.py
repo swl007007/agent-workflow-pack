@@ -231,7 +231,7 @@ def _verify_command(inputs: RuntimeAuthorityInputs) -> None:
     if inputs.command == "doctor":
         return
     if (
-        inputs.command != "recover"
+        inputs.command not in {"recover", "task-recover"}
         or inputs.recovery_transaction_id != journal.transaction_id
     ):
         raise RuntimeFailure(

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import os
 import uuid
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -12,17 +14,38 @@ from types import MappingProxyType
 from typing import cast
 
 from agent_stack.cli.production import ProductionCommand, _authorize_running_release
-from agent_stack.core.api import canonical_json_bytes
+from agent_stack.core.api import (
+    canonical_json_bytes,
+    normalize_mode,
+    normalize_path,
+    validate_surface_registry,
+)
 from agent_stack.reconcile.production_bundle import load_production_bundle
 from agent_stack.release.compatibility import RuntimeJournalReference
 from agent_stack.release.manifest import VerifiedRelease
 
-from .authority import RuntimeAuthorityInputs, verify_runtime_authority
+from .authority import RuntimeAuthorityInputs, RuntimeJournalEvidence, verify_runtime_authority
 from .bootstrap import launcher_contract_from_release
 from .caller_context import VerifiedCallerContext, verify_caller_context
 from .errors import RuntimeFailure
 from .integration import VerifiedIntegration, validate_integration
-from .task_service import TaskClaimRequest, TaskReleaseRequest, claim_task, release_task
+from .runtime_load import (
+    RuntimeEntryDescriptor,
+    TaskRuntimeLoadRequest,
+    load_task_runtime,
+)
+from .task_service import (
+    TaskClaimRequest,
+    TaskArchiveRequest,
+    TaskReleaseRequest,
+    TaskTransitionRequest,
+    claim_task,
+    archive_task,
+    release_task,
+    transition_task,
+)
+from .recovery import TaskRecoveryRequest, recover_task_transaction
+from .task_journal import read_task_journal
 from .workspace import register_workspace
 
 
@@ -95,7 +118,12 @@ def _caller_probe(context: VerifiedCallerContext) -> Mapping[str, object]:
     )
 
 
-def _verified_project(command: ProductionCommand) -> tuple[
+def _verified_project(
+    command: ProductionCommand,
+    *,
+    journal: RuntimeJournalEvidence | None = None,
+    recovery_transaction_id: str | None = None,
+) -> tuple[
     VerifiedRelease, Mapping[str, object], VerifiedCallerContext
 ]:
     release = cast(VerifiedRelease, _authorize_running_release())
@@ -119,10 +147,10 @@ def _verified_project(command: ProductionCommand) -> tuple[
             launcher_contract=launcher_contract_from_release(release),
             launcher_bytes=launcher,
             runtime_control_bytes=control,
-            journal=None,
+            journal=journal,
             maintenance_marker=None,
             command=command.invocation.command,
-            recovery_transaction_id=None,
+            recovery_transaction_id=recovery_transaction_id,
         )
     )
     caller = verify_caller_context(
@@ -157,17 +185,41 @@ def _mutation_result(result: object) -> Mapping[str, object]:
     )
 
 
+def _runtime_evidence(
+    bundle: object, project_root: Path
+) -> tuple[Mapping[str, object], ...]:
+    inventory = getattr(bundle, "runtime_unit_inventory")
+    evidence = {
+        str(item["unit_id"]): dict(item)
+        for item in getattr(bundle, "runtime_unit_evidence")
+    }
+    units = inventory.get("units")
+    if not isinstance(units, list):
+        raise RuntimeFailure("AWP_TASK_SURFACE_MISMATCH", "runtime inventory is invalid")
+    for raw in units:
+        if not isinstance(raw, Mapping) or raw.get("distribution_scope") != "rendered-project":
+            continue
+        unit_id = raw.get("unit_id")
+        relative = raw.get("normalized_path")
+        if not isinstance(unit_id, str) or not isinstance(relative, str):
+            raise RuntimeFailure("AWP_TASK_SURFACE_MISMATCH", "runtime unit is invalid")
+        path = project_root / relative
+        if path.is_symlink() or not path.is_file():
+            raise RuntimeFailure(
+                "AWP_TASK_SURFACE_MISMATCH", "rendered runtime unit is unavailable"
+            )
+        payload = path.read_bytes()
+        evidence[unit_id].update(
+            byte_hash=hashlib.sha256(payload).hexdigest(),
+            mode=normalize_mode(os.stat(path, follow_symlinks=False).st_mode),
+        )
+    return tuple(evidence[unit_id] for unit_id in sorted(evidence))
+
+
 def _workspace_registration_required(payload: object) -> object:
     raise RuntimeFailure(
         "AWP_WORKSPACE_REGISTRATION_REQUIRED",
         "command requires a verified initialized workspace contract",
-    )
-
-
-def _task_authority_required(payload: object) -> object:
-    raise RuntimeFailure(
-        "AWP_TASK_RUNTIME_LOAD_DENIED",
-        "command requires verified task integration and transaction authority",
     )
 
 
@@ -203,11 +255,107 @@ def run_workspace_migrate(payload: object) -> object:
 
 
 def run_task_runtime_load(payload: object) -> object:
-    return _task_authority_required(payload)
+    command = cast(ProductionCommand, payload)
+    _verified_project(command)
+    options = command.invocation.options
+    integration = _load_integration(command.repository_root, options.get("task_ref"))
+    task_id = options.get("task_id")
+    revision = options.get("revision")
+    phase = options.get("phase")
+    claim_token = options.get("claim")
+    surface = options.get("surface")
+    entry_id = options.get("entry")
+    if (
+        not isinstance(task_id, str)
+        or not isinstance(revision, int)
+        or isinstance(revision, bool)
+        or not isinstance(phase, str)
+        or not isinstance(claim_token, str)
+        or not isinstance(surface, str)
+        or not isinstance(entry_id, str)
+    ):
+        raise RuntimeFailure("AWP_TASK_RUNTIME_LOAD_DENIED", "runtime-load input is invalid")
+    expected_phase = None if phase == "none" else phase
+    expected_claim: Mapping[str, object] | None = None
+    if claim_token != "none":
+        if integration.executor_claim is None or integration.executor_claim.get(
+            "claim_id"
+        ) != claim_token:
+            raise RuntimeFailure("AWP_TASK_STATE_STALE", "runtime-load claim changed")
+        expected_claim = integration.executor_claim
+    bundle = load_production_bundle(_data_root())
+    raw_entries = bundle.runtime_entries.get("entries")
+    if not isinstance(raw_entries, list):
+        raise RuntimeFailure("AWP_TASK_RUNTIME_LOAD_DENIED", "runtime-entry registry is invalid")
+    entries: dict[str, RuntimeEntryDescriptor] = {}
+    for raw in raw_entries:
+        if not isinstance(raw, Mapping):
+            raise RuntimeFailure(
+                "AWP_TASK_RUNTIME_LOAD_DENIED", "runtime-entry registry is invalid"
+            )
+        descriptor = RuntimeEntryDescriptor(
+            entry_id=str(raw.get("entry_id")),
+            owning_surface_id=str(raw.get("owning_surface_id")),
+            allowed_modes=tuple(str(value) for value in raw.get("allowed_modes", ())),
+            allowed_lifecycle_statuses=tuple(
+                str(value) for value in raw.get("allowed_lifecycle_statuses", ())
+            ),
+            allowed_phases=tuple(str(value) for value in raw.get("allowed_phases", ())),
+            claim_policy=str(raw.get("claim_policy")),
+        )
+        if descriptor.entry_id in entries:
+            raise RuntimeFailure(
+                "AWP_TASK_RUNTIME_LOAD_DENIED", "runtime-entry identity repeats"
+            )
+        entries[descriptor.entry_id] = descriptor
+    registry = validate_surface_registry(
+        bundle.surface_registry, bundle.runtime_unit_inventory
+    )
+    contract_evidence = _runtime_evidence(bundle, command.repository_root)
+    loaded = load_task_runtime(
+        TaskRuntimeLoadRequest(
+            project_root=command.repository_root,
+            package_root=_data_root().parent,
+            task_ref=integration.task_ref,
+            task_id=task_id,
+            expected_state_revision=revision,
+            expected_lifecycle_status=integration.lifecycle_status,
+            expected_phase=expected_phase,
+            expected_claim=expected_claim,
+            surface_id=surface,
+            runtime_entry_id=entry_id,
+            registry=registry,
+            contract_evidence=contract_evidence,
+            runtime_entries=MappingProxyType(entries),
+        )
+    )
+    return MappingProxyType(
+        {
+            "schema_id": "agent-workflow.runtime-load-result",
+            "schema_version": 1,
+            "task_id": loaded.task_id,
+            "task_ref": loaded.task_ref,
+            "state_revision": loaded.state_revision,
+            "surface_id": loaded.surface_id,
+            "runtime_entry_id": loaded.runtime_entry_id,
+            "unit_ids": sorted(loaded.units),
+        }
+    )
 
 
 def run_task_admit(payload: object) -> object:
-    return _task_authority_required(payload)
+    command = cast(ProductionCommand, payload)
+    _verified_project(command)
+    task_ref = command.invocation.options.get("task_ref")
+    if not isinstance(task_ref, str):
+        raise RuntimeFailure("AWP_TASK_REF_CONFLICT", "task ref is unavailable")
+    normalized = normalize_path(task_ref)
+    if normalized != task_ref or (command.repository_root / normalized).exists():
+        raise RuntimeFailure("AWP_TASK_REF_CONFLICT", "task ref is unavailable")
+    raise RuntimeFailure(
+        "AWP_ROUTE_APPROVAL_INVALID",
+        "public task admission lacks a verified platform Decision and approval envelope",
+    )
 
 
 def run_task_claim(payload: object) -> object:
@@ -237,7 +385,37 @@ def run_task_claim(payload: object) -> object:
 
 
 def run_task_transition(payload: object) -> object:
-    return _task_authority_required(payload)
+    command = cast(ProductionCommand, payload)
+    _verified_project(command)
+    options = command.invocation.options
+    integration = _load_integration(command.repository_root, options.get("task_ref"))
+    revision = options.get("revision")
+    target = options.get("target_status")
+    if (
+        not isinstance(revision, int)
+        or isinstance(revision, bool)
+        or not isinstance(target, str)
+    ):
+        raise RuntimeFailure("AWP_TASK_STATE_STALE", "task transition input is invalid")
+    if integration.mode != "trellis-native":
+        raise RuntimeFailure(
+            "AWP_TASK_TRANSITION_INVALID",
+            "heavy task transition requires an explicit phase contract",
+        )
+    result = transition_task(
+        TaskTransitionRequest(
+            project_root=command.repository_root,
+            task_ref=integration.task_ref,
+            task_id=integration.task_id,
+            expected_revision=revision,
+            transition_id=str(uuid.uuid4()),
+            target_lifecycle_status=target,
+            target_phase=None,
+            completion_flags=None,
+            changed_at=datetime.now(UTC),
+        )
+    )
+    return _mutation_result(result)
 
 
 def run_task_release(payload: object) -> object:
@@ -272,11 +450,67 @@ def run_task_release(payload: object) -> object:
 
 
 def run_task_archive(payload: object) -> object:
-    return _task_authority_required(payload)
+    command = cast(ProductionCommand, payload)
+    _verified_project(command)
+    options = command.invocation.options
+    integration = _load_integration(command.repository_root, options.get("task_ref"))
+    revision = options.get("revision")
+    if not isinstance(revision, int) or isinstance(revision, bool):
+        raise RuntimeFailure("AWP_TASK_STATE_STALE", "task archive input is invalid")
+    bundle = load_production_bundle(_data_root())
+    result = archive_task(
+        TaskArchiveRequest(
+            project_root=command.repository_root,
+            transaction_id=str(uuid.uuid4()),
+            task_ref=integration.task_ref,
+            task_id=integration.task_id,
+            expected_revision=revision,
+            archive_root=bundle.trellis_layout.archive_root,
+            metadata_mutations=(),
+            archived_at=datetime.now(UTC),
+        )
+    )
+    return _mutation_result(result)
 
 
 def run_task_recover(payload: object) -> object:
-    return _task_authority_required(payload)
+    command = cast(ProductionCommand, payload)
+    transaction_id = command.invocation.options.get("transaction_id")
+    action = command.invocation.options.get("recovery_action")
+    if not isinstance(transaction_id, str) or action not in {"resume", "rollback"}:
+        raise RuntimeFailure(
+            "AWP_TASK_TRANSACTION_RECOVERY_REQUIRED", "task recovery input is invalid"
+        )
+    document = read_task_journal(command.repository_root, transaction_id)
+    header = document.get("immutable_header")
+    if not isinstance(header, Mapping):
+        raise RuntimeFailure(
+            "AWP_TASK_TRANSACTION_RECOVERY_REQUIRED", "task journal header is invalid"
+        )
+    runtime = header.get("recovery_runtime")
+    if not isinstance(runtime, Mapping):
+        raise RuntimeFailure(
+            "AWP_TASK_TRANSACTION_RECOVERY_REQUIRED", "task recovery runtime is invalid"
+        )
+    evidence = RuntimeJournalEvidence(
+        transaction_id=transaction_id,
+        journal_kind="task",
+        phase=str(document["phase"]),
+        recovery_runtime=RuntimeJournalReference(
+            str(runtime.get("runtime_role")),
+            str(runtime.get("release_id")),
+            str(runtime.get("release_manifest_digest")),
+        ),
+        file_transitions=MappingProxyType({}),
+        journal_binding_digest=str(document["journal_binding_digest"]),
+    )
+    _verified_project(
+        command, journal=evidence, recovery_transaction_id=transaction_id
+    )
+    result = recover_task_transaction(
+        TaskRecoveryRequest(command.repository_root, transaction_id, action)
+    )
+    return _mutation_result(result)
 
 
 __all__ = [

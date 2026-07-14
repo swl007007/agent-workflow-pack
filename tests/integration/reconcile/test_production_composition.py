@@ -5,9 +5,13 @@ import shutil
 import json
 import subprocess
 from collections.abc import Mapping
+from dataclasses import replace
 from types import MappingProxyType
 
+import pytest
+
 from agent_stack.cli.parser import CommandInvocation
+from agent_stack.core.api import canonical_json_bytes, compute_surface_digests, validate_surface_registry
 from agent_stack.cli.production import ProductionCommand
 from agent_stack.reconcile import commands
 from agent_stack.release import commands as release_commands
@@ -16,6 +20,7 @@ from agent_stack.release.identity import ReleaseIdentity
 from agent_stack.release.manifest import VerifiedRelease
 from agent_stack.runtime import commands as runtime_commands
 from agent_stack.runtime.task_service import admit_task
+from agent_stack.runtime.errors import RuntimeFailure
 from tests.integration.runtime.test_task_admission import admission_request, initialize_project
 
 
@@ -105,7 +110,7 @@ def _launcher_command(
 
 
 def _installed_data_tree(root: Path) -> Path:
-    data = root / "installed-data"
+    data = root / "package/agent_stack/data"
     for name in (
         "artifact-definitions",
         "catalog",
@@ -119,6 +124,10 @@ def _installed_data_tree(root: Path) -> Path:
     module = data.parent / "reconcile/production_bundle.py"
     module.parent.mkdir(parents=True)
     shutil.copy2(ROOT / "src/agent_stack/reconcile/production_bundle.py", module)
+    for path in data.rglob("*"):
+        if path.is_file():
+            path.chmod(0o644)
+    module.chmod(0o644)
     return data
 
 
@@ -337,3 +346,287 @@ def test_production_task_claim_loads_real_integration_and_calls_domain_service(
 
     assert released["state_revision"] == result["state_revision"] + 1
     assert released["executor_claim"] is None
+
+
+def test_production_native_task_transition_calls_domain_service(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+
+    task_source = tmp_path / "native-source"
+    initialize_project(task_source)
+    admitted = admit_task(admission_request(task_source))
+    target = project / admitted.task_ref
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(task_source / admitted.task_ref, target)
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+
+    result = runtime_commands.run_task_transition(
+        _launcher_command(
+            project,
+            tmp_path / "caller-transition",
+            command="task-transition",
+            options=MappingProxyType(
+                {
+                    "task_ref": admitted.task_ref,
+                    "revision": admitted.state_revision,
+                    "target_status": "completed",
+                }
+            ),
+        )
+    )
+
+    assert result["lifecycle_status"] == "completed"
+    assert result["state_revision"] == admitted.state_revision + 1
+
+    archived = runtime_commands.run_task_archive(
+        _launcher_command(
+            project,
+            tmp_path / "caller-archive",
+            command="task-archive",
+            options=MappingProxyType(
+                {
+                    "task_ref": admitted.task_ref,
+                    "revision": result["state_revision"],
+                }
+            ),
+        )
+    )
+
+    assert archived["lifecycle_status"] == "archived"
+    assert not (project / admitted.task_ref).exists()
+    assert (
+        project
+        / f".trellis/tasks/archive/example--{admitted.task_id}/integration.yaml"
+    ).is_file()
+
+
+def test_production_task_recover_resumes_exact_unfinished_journal(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import agent_stack.runtime.task_service as task_service_module
+
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    workspace = json.loads(
+        (project / ".agent-workflow/local/workspace.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+    request = admission_request(project)
+    request = replace(
+        request,
+        project_id=manifest["project_id"],
+        workspace_instance_id=workspace["workspace_instance_id"],
+        approval_proof={
+            **dict(request.approval_proof),
+            "workspace_instance_id": workspace["workspace_instance_id"],
+        },
+        current_authorities={
+            "workspace_instance_id": workspace["workspace_instance_id"]
+        },
+        recovery_runtime={
+            "runtime_role": "committed",
+            "release_id": registered_release.identity.release_id,
+            "release_manifest_digest": registered_release.manifest_digest,
+        },
+    )
+
+    def crash(point: str) -> None:
+        if point == "after_staged":
+            raise RuntimeError("simulated crash")
+
+    monkeypatch.setattr(task_service_module, "_crash_at", crash)
+    with pytest.raises(RuntimeError, match="simulated crash"):
+        admit_task(request)
+    monkeypatch.setattr(task_service_module, "_crash_at", lambda point: None)
+
+    result = runtime_commands.run_task_recover(
+        _launcher_command(
+            project,
+            tmp_path / "caller-recover",
+            command="task-recover",
+            options=MappingProxyType(
+                {
+                    "transaction_id": request.transaction_id,
+                    "recovery_action": "resume",
+                }
+            ),
+        )
+    )
+
+    assert result["outcome"] == "committed"
+    assert result["lifecycle_status"] == "active"
+
+
+def test_production_runtime_load_uses_packaged_registry_and_installed_paths(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+
+    bundle = load_production_bundle(data_root)
+    registry = validate_surface_registry(
+        bundle.surface_registry, bundle.runtime_unit_inventory
+    )
+    pins = compute_surface_digests(
+        registry, runtime_commands._runtime_evidence(bundle, project)
+    )
+    task_source = tmp_path / "runtime-source"
+    initialize_project(task_source)
+    admitted = admit_task(admission_request(task_source))
+    integration = json.loads(
+        (task_source / admitted.task_ref / "integration.yaml").read_text(encoding="utf-8")
+    )
+    integration["workflow_contract"]["task_contract_surfaces"] = [
+        {"surface_id": surface_id, "surface_digest": pins[surface_id]}
+        for surface_id in sorted(pins)
+    ]
+    target = project / admitted.task_ref
+    target.mkdir(parents=True)
+    (target / "README.md").write_text("# Task\n", encoding="utf-8")
+    (target / "integration.yaml").write_bytes(canonical_json_bytes(integration))
+    (target / "integration.yaml").chmod(0o640)
+
+    result = runtime_commands.run_task_runtime_load(
+        _launcher_command(
+            project,
+            tmp_path / "caller-runtime-load",
+            command="task-runtime-load",
+            options=MappingProxyType(
+                {
+                    "task_ref": admitted.task_ref,
+                    "task_id": admitted.task_id,
+                    "revision": admitted.state_revision,
+                    "phase": "none",
+                    "claim": "none",
+                    "surface": "platform-adapter:codex",
+                    "entry": "codex-wrapper",
+                }
+            ),
+        )
+    )
+
+    assert result["runtime_entry_id"] == "codex-wrapper"
+    assert "render-unit:codex-wrapper" in result["unit_ids"]
+
+
+def test_public_task_admit_fails_at_missing_platform_approval_not_placeholder(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+
+    with pytest.raises(RuntimeFailure) as captured:
+        runtime_commands.run_task_admit(
+            _launcher_command(
+                project,
+                tmp_path / "caller-admit",
+                command="task-admit",
+                options=MappingProxyType({"task_ref": ".trellis/tasks/new"}),
+            )
+        )
+
+    assert captured.value.code == "AWP_ROUTE_APPROVAL_INVALID"

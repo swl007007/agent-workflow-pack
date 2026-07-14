@@ -31,6 +31,7 @@ class ProductionBundle:
     surface_registry: Mapping[str, object]
     runtime_unit_inventory: Mapping[str, object]
     runtime_unit_evidence: tuple[Mapping[str, object], ...]
+    runtime_entries: Mapping[str, object]
     artifact_definitions: tuple[Mapping[str, object], ...]
     template_root: Path
     trellis_layout: VerifiedTrellisTaskLayout
@@ -69,12 +70,17 @@ def _unit_path(root: Path, unit: Mapping[str, object]) -> Path:
             relative = template_by_target[relative]
         except KeyError as error:
             raise _failure("rendered runtime unit lacks one frozen template") from error
-    elif scope == "runtime-package" and relative.startswith("src/agent_stack/"):
-        checkout_candidate = root / relative
-        if checkout_candidate.is_file():
-            return checkout_candidate
-        relative = relative.removeprefix("src/agent_stack/")
-        return root.parent / relative
+    elif scope == "runtime-package":
+        package_relative = relative.removeprefix("data/")
+        candidates = (
+            root / package_relative,
+            root.parent / relative,
+            root / "src/agent_stack" / package_relative,
+            root.parent / package_relative,
+        )
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate
     return root / relative
 
 
@@ -141,6 +147,7 @@ def load_production_bundle(root: Path) -> ProductionBundle:
     workflow_lock = _load_yaml(root / "catalog/workflow.lock")
     registry = _load_yaml(root / "catalog/runtime-surfaces.yaml")
     inventory = _load_yaml(root / "catalog/runtime-units.yaml")
+    runtime_entries = _load_yaml(root / "catalog/runtime-entries.yaml")
     route_policy = _load_yaml(root / "catalog/route-policy.yaml")
     router_contract = _load_yaml(root / "catalog/router-contract.yaml")
     trust_policy = _load_yaml(root / "release/trust-policy.yaml")
@@ -189,6 +196,7 @@ def load_production_bundle(root: Path) -> ProductionBundle:
         surface_registry=registry,
         runtime_unit_inventory=inventory,
         runtime_unit_evidence=_evidence(root, inventory),
+        runtime_entries=runtime_entries,
         artifact_definitions=definitions,
         template_root=root / "templates",
         trellis_layout=trellis_layout,
