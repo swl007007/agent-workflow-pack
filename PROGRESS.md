@@ -22,6 +22,7 @@
 - Production heavy-task claim/release now load canonical integration state, verify project/caller authority, and call the real Task-state Service with generated transaction identities.
 - Production task transition/archive/recovery and existing-task runtime load now call the real domain services; the runtime inventory uses installed-package paths and a packaged runtime-entry registry.
 - Public `task admit` now establishes project/caller authority and fails specifically at the absent platform-authenticated Decision/proof boundary instead of a fixed Runtime placeholder; it does not manufacture approval.
+- Production `workspace migrate` now reconstructs source identity/contract/layout from canonical clone-local state, verifies an exact target-owned compatibility edge, scans source/target task state, and calls the real migration transaction.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
@@ -39,4 +40,4 @@
 
 ## Resume
 
-Bind workspace migration/recovery and lifecycle recovery using verified source/candidate evidence, then close the installed-wheel console chain.
+Bind explicit workspace registration/migration and lifecycle recovery using their exact journals, then close lifecycle upgrade and the installed-wheel console chain.

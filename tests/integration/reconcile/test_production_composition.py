@@ -630,3 +630,130 @@ def test_public_task_admit_fails_at_missing_platform_approval_not_placeholder(
         )
 
     assert captured.value.code == "AWP_ROUTE_APPROVAL_INVALID"
+
+
+def test_production_workspace_migrate_uses_exact_target_owned_edge(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    base = _verified_release()
+    target_identity = ReleaseIdentity(
+        base.identity.repository_id,
+        base.identity.distribution_name,
+        "0.2.0",
+    )
+    target = VerifiedRelease(
+        identity=target_identity,
+        manifest_digest="c" * 64,
+        source_commit=base.source_commit,
+        bundles=base.bundles,
+        assets=base.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", lambda: target)
+    commands.run_init(_command(project, dry_run=False))
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    workspace_path = project / ".agent-workflow/local/workspace.json"
+    workspace = json.loads(workspace_path.read_text(encoding="utf-8"))
+    source_identity = ReleaseIdentity(
+        target.identity.repository_id,
+        target.identity.distribution_name,
+        "0.1.0",
+    )
+    source_contract_digest = "e" * 64
+    workspace.update(
+        local_state_release_id=source_identity.release_id,
+        local_state_release_version=source_identity.version,
+        local_state_release_manifest_digest="d" * 64,
+        local_state_contract_digest=source_contract_digest,
+    )
+    workspace_path.write_bytes(canonical_json_bytes(workspace))
+    target_bundles = {
+        field: target.bundles[field]
+        for field in (
+            "trust_policy",
+            "workflow_lock",
+            "artifact",
+            "schema",
+            "migration",
+            "launcher",
+        )
+    }
+    edge = {
+        "from_release_id": source_identity.release_id,
+        "to_release_id": target.identity.release_id,
+        "from_version": source_identity.version,
+        "to_version": target.identity.version,
+        "trust_policy_digest": target.bundles["trust_policy"],
+        "target_bundles": target_bundles,
+        "schema_transitions": {
+            field: {"from": 1, "to": 1}
+            for field in (
+                "manifest",
+                "workflow_lock",
+                "integration",
+                "task_transaction",
+                "workspace",
+                "approval_replay",
+                "task_outbox",
+            )
+        },
+        "local_state_contracts": {
+            "from": source_contract_digest,
+            "to": manifest["local_state_contract"]["contract_digest"],
+        },
+        "trellis_task_layouts": {
+            "from": workspace["trellis_task_layout"]["layout_digest"],
+            "to": manifest["local_state_contract"]["trellis_task_layout_digest"],
+        },
+        "migrations": [
+            {"migration_id": "local-state-v1", "migration_digest": "f" * 64}
+        ],
+    }
+    target = replace(
+        target,
+        bundles={
+            **dict(target.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+    )
+    target_bundles.update(
+        artifact=target.bundles["artifact"],
+        workflow_lock=target.bundles["workflow_lock"],
+        trust_policy=target.bundles["trust_policy"],
+    )
+    edge["target_bundles"] = target_bundles
+    target = replace(
+        target,
+        compatibility={
+            "schema_id": "agent-workflow.release-compatibility",
+            "schema_version": 1,
+            "release_id": target.identity.release_id,
+            "edges": [edge],
+        },
+    )
+    monkeypatch.setattr(runtime_commands, "_authorize_running_release", lambda: target)
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+
+    result = runtime_commands.run_workspace_migrate(
+        _launcher_command(
+            project,
+            tmp_path / "caller-migrate",
+            command="workspace-migrate",
+        )
+    )
+
+    migrated = json.loads(workspace_path.read_text(encoding="utf-8"))
+    assert result["committed"] is True
+    assert migrated["local_state_release_id"] == target.identity.release_id
+    assert migrated["local_state_contract_digest"] == manifest["local_state_contract"][
+        "contract_digest"
+    ]

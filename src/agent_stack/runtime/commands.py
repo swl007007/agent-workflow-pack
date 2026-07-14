@@ -19,9 +19,15 @@ from agent_stack.core.api import (
     normalize_mode,
     normalize_path,
     validate_surface_registry,
+    validate_trellis_layout,
 )
 from agent_stack.reconcile.production_bundle import load_production_bundle
-from agent_stack.release.compatibility import RuntimeJournalReference
+from agent_stack.release.compatibility import (
+    LocalStateContract,
+    RuntimeJournalReference,
+    classify_compatibility,
+)
+from agent_stack.release.identity import ReleaseIdentity
 from agent_stack.release.manifest import VerifiedRelease
 
 from .authority import RuntimeAuthorityInputs, RuntimeJournalEvidence, verify_runtime_authority
@@ -34,6 +40,7 @@ from .runtime_load import (
     TaskRuntimeLoadRequest,
     load_task_runtime,
 )
+from .scanner import NormativeTaskScanner
 from .task_service import (
     TaskClaimRequest,
     TaskArchiveRequest,
@@ -46,7 +53,7 @@ from .task_service import (
 )
 from .recovery import TaskRecoveryRequest, recover_task_transaction
 from .task_journal import read_task_journal
-from .workspace import register_workspace
+from .workspace import migrate_workspace, register_workspace
 
 
 def _data_root() -> Path:
@@ -216,13 +223,6 @@ def _runtime_evidence(
     return tuple(evidence[unit_id] for unit_id in sorted(evidence))
 
 
-def _workspace_registration_required(payload: object) -> object:
-    raise RuntimeFailure(
-        "AWP_WORKSPACE_REGISTRATION_REQUIRED",
-        "command requires a verified initialized workspace contract",
-    )
-
-
 def run_workspace_register(payload: object) -> object:
     command = cast(ProductionCommand, payload)
     release, manifest, caller = _verified_project(command)
@@ -251,7 +251,118 @@ def run_workspace_register(payload: object) -> object:
 
 
 def run_workspace_migrate(payload: object) -> object:
-    return _workspace_registration_required(payload)
+    command = cast(ProductionCommand, payload)
+    target_release, target_manifest, _ = _verified_project(command)
+    root = command.repository_root
+    workspace = _canonical_object(root / ".agent-workflow/local/workspace.json")
+    bundle = load_production_bundle(_data_root())
+    source_layout_document = workspace.get("trellis_task_layout")
+    if not isinstance(source_layout_document, Mapping):
+        raise RuntimeFailure(
+            "AWP_WORKSPACE_MIGRATION_RECOVERY_REQUIRED",
+            "workspace source layout is unavailable",
+        )
+    claimed_layout_digest = source_layout_document.get("layout_digest")
+    normalized_layout = {
+        key: value
+        for key, value in source_layout_document.items()
+        if key != "layout_digest"
+    }
+    artifact_targets = tuple(
+        str(target["path"])
+        for definition in bundle.artifact_definitions
+        for target in cast(list[Mapping[str, object]], definition["targets"])
+    )
+    source_layout = validate_trellis_layout(
+        normalized_layout, artifact_targets=artifact_targets
+    )
+    if source_layout.layout_digest != claimed_layout_digest:
+        raise RuntimeFailure(
+            "AWP_WORKSPACE_MIGRATION_RECOVERY_REQUIRED",
+            "workspace source layout digest changed",
+        )
+    schema_versions = {
+        "manifest": 1,
+        "workflow_lock": 1,
+        "integration": 1,
+        "task_transaction": 1,
+        "workspace": 1,
+        "approval_replay": 1,
+        "task_outbox": 1,
+    }
+    source_contract = LocalStateContract(
+        contract_digest=str(workspace.get("local_state_contract_digest")),
+        trellis_task_layout_digest=source_layout.layout_digest,
+        schema_versions=MappingProxyType(schema_versions),
+    )
+    target_local = target_manifest.get("local_state_contract")
+    if not isinstance(target_local, Mapping):
+        raise RuntimeFailure(
+            "AWP_WORKSPACE_MIGRATION_RECOVERY_REQUIRED",
+            "target local-state contract is unavailable",
+        )
+    target_contract = LocalStateContract(
+        contract_digest=str(target_local.get("contract_digest")),
+        trellis_task_layout_digest=bundle.trellis_layout.layout_digest,
+        schema_versions=MappingProxyType(schema_versions),
+    )
+    source_identity = ReleaseIdentity(
+        target_release.identity.repository_id,
+        target_release.identity.distribution_name,
+        str(workspace.get("local_state_release_version")),
+    )
+    if source_identity.release_id != workspace.get("local_state_release_id"):
+        raise RuntimeFailure(
+            "AWP_WORKSPACE_SOURCE_METADATA_REQUIRED",
+            "workspace source release identity is invalid",
+        )
+    source_release = VerifiedRelease(
+        identity=source_identity,
+        manifest_digest=str(workspace.get("local_state_release_manifest_digest")),
+        source_commit="0" * 40,
+        bundles=MappingProxyType(
+            {"trust_policy": str(target_release.bundles.get("trust_policy"))}
+        ),
+        assets=MappingProxyType({}),
+        immutable_release=True,
+    )
+    compatibility = classify_compatibility(
+        source_release, target_release, source_contract
+    )
+    scanner = NormativeTaskScanner(root)
+    snapshot = scanner(
+        source_layout,
+        bundle.trellis_layout,
+        bundle.discovery_schemas,
+        bundle.discovery_schemas,
+    )
+    result = migrate_workspace(
+        root,
+        source_contract,
+        target_contract,
+        compatibility,
+        snapshot,
+        target_manifest=target_manifest,
+        source_layout=source_layout,
+        target_layout=bundle.trellis_layout,
+        source_schemas=bundle.discovery_schemas,
+        target_schemas=bundle.discovery_schemas,
+        scanner=scanner,
+        transaction_id=str(uuid.uuid4()),
+        recovery_runtime=RuntimeJournalReference(
+            "committed",
+            target_release.identity.release_id,
+            target_release.manifest_digest,
+        ),
+    )
+    return MappingProxyType(
+        {
+            "schema_id": "agent-workflow.workspace-migration-result",
+            "schema_version": 1,
+            "committed": result.committed,
+            "workspace_instance_id": result.workspace["workspace_instance_id"],
+        }
+    )
 
 
 def run_task_runtime_load(payload: object) -> object:
