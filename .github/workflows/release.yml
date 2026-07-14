@@ -78,9 +78,9 @@ jobs:
       - run: uv run python tools/release/build_artifacts.py --verify-existing dist/release-artifact-set.json
       - name: Publish once under repository immutability
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.IMMUTABLE_RELEASE_TOKEN }}
         run: uv run python tools/release/publish_release.py --version "${{ inputs.version }}"
       - name: Re-fetch immutable assets and verify exact hashes
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.IMMUTABLE_RELEASE_TOKEN }}
         run: uv run python tools/release/verify_published_release.py --version "${{ inputs.version }}"

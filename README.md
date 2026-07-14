@@ -13,10 +13,10 @@ verification, and review; its planner and executor are not automatically exposed
 
 ## Release status
 
-**v0.1.4 is an immutable failed release and must not be used. No accepted release is
+**v0.1.5 is a failed release candidate and must not be used. No accepted release is
 currently available.**
 
-Versions `0.1.0` through `0.1.4` are retained as failed publications. Their tags, release
+Versions `0.1.0` through `0.1.5` are retained as failed publications or candidates. Their tags, release
 metadata, and assets must not be moved, replaced, or treated as installation authorities.
 
 The canonical first-install command is published with the release and binds:
