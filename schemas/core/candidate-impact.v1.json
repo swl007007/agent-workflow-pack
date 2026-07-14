@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.candidate-impact",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": ["agent-workflow.candidate-impact.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "impact_kind",
+    "authority_changes",
+    "surface_changes",
+    "candidate_impact_digest"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.candidate-impact"},
+    "schema_version": {"const": 1},
+    "impact_kind": {"enum": ["none", "runtime-visible"]},
+    "authority_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["authority_id", "before_digest", "after_digest"],
+        "properties": {
+          "authority_id": {
+            "enum": [
+              "artifact-bundle",
+              "profile",
+              "release-identity",
+              "route-policy",
+              "router-contract",
+              "surface-registry",
+              "trellis-layout",
+              "workflow-lock"
+            ]
+          },
+          "before_digest": {"$ref": "#/definitions/digestOrNull"},
+          "after_digest": {"$ref": "#/definitions/digestOrNull"}
+        }
+      }
+    },
+    "surface_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "surface_id",
+          "change_kind",
+          "contract_before_digest",
+          "observed_before_digest",
+          "after_digest"
+        ],
+        "properties": {
+          "surface_id": {"type": "string", "minLength": 1},
+          "change_kind": {"enum": ["contract-change", "repair"]},
+          "contract_before_digest": {"$ref": "#/definitions/digestOrNull"},
+          "observed_before_digest": {"$ref": "#/definitions/digestOrNull"},
+          "after_digest": {"$ref": "#/definitions/digestOrNull"}
+        }
+      }
+    },
+    "candidate_impact_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "definitions": {
+    "digestOrNull": {
+      "oneOf": [
+        {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        {"const": "canonical-null"}
+      ]
+    }
+  }
+}
