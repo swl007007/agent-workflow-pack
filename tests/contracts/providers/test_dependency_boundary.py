@@ -7,10 +7,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 PROVIDER_ROOT = ROOT / "src/agent_stack/providers"
 STDLIB = {
-    "__future__", "abc", "argparse", "array", "ast", "base64", "collections", "contextlib",
+    "__future__", "abc", "argparse", "array", "ast", "base64", "collections", "contextlib", "ctypes",
     "dataclasses", "datetime", "enum", "errno", "fcntl", "functools", "hashlib",
     "hmac", "http", "io", "ipaddress", "json", "locale", "logging", "math",
-    "mmap", "os", "pathlib", "platform", "queue", "re", "resource", "secrets",
+    "mmap", "multiprocessing", "os", "pathlib", "platform", "queue", "re", "resource", "secrets",
     "select", "shlex", "shutil", "signal", "socket", "stat", "string", "struct",
     "subprocess", "sys", "tarfile", "tempfile", "threading", "time", "types",
     "typing", "unicodedata", "urllib", "uuid", "zipfile",

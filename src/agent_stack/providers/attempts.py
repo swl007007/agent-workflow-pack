@@ -304,7 +304,11 @@ class AttemptStore:
             if attempt.get("state") != "prepared":
                 raise _corrupt("only a prepared attempt may become released")
             self._validate_receipt(attempt, receipt)
-            self._write_receipt(attempt_id, receipt)
+            stored_receipt = self._load_receipt(attempt_id)
+            if stored_receipt is None:
+                self._write_receipt(attempt_id, receipt)
+            elif stored_receipt != receipt:
+                raise _corrupt("stored release receipt disagrees with broker acknowledgement")
             released = {
                 **attempt,
                 "state": "released",
@@ -313,6 +317,14 @@ class AttemptStore:
             attempts[index] = released
             self._write(document)
             return self._record(released)
+
+    def get_attempt(self, attempt_id: str) -> AttemptRecord:
+        """Read one validated attempt under the provider-plan lock."""
+
+        with self._lock():
+            document = self._load()
+            _, _, attempt = self._find(document, attempt_id)
+            return self._record(attempt)
 
     def record_terminal(
         self,
