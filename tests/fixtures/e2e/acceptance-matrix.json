@@ -1,0 +1,583 @@
+{
+  "schema_id": "agent-workflow.acceptance-matrix",
+  "schema_version": 1,
+  "criteria": [
+    {
+      "ac_id": "AC-01",
+      "primary_owner": "Task 6",
+      "scenario_group": "distribution",
+      "primary_node": "tests/packaging/test_self_contained_wheel.py::test_wheel_has_no_runtime_requires_dist_and_exposes_cli",
+      "supporting_nodes": [
+        "tests/e2e/test_distribution_sequence.py::test_git_wheel_and_sdist_execute_identical_render_and_cli_flow"
+      ]
+    },
+    {
+      "ac_id": "AC-02",
+      "primary_owner": "Task 5",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/route/test_capabilities.py::test_three_locked_contracts_have_exact_versions_entries_and_gates",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-03",
+      "primary_owner": "Task 5",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/golden/route/test_adapter_projection.py::test_three_platform_projections_match_exact_golden_contracts",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-04",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/reconcile/test_apply.py::test_true_noop_apply_performs_zero_target_writes",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-05",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/reconcile/test_ownership.py::test_managed_create_replace_enrollment_and_retirement",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-06",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/reconcile/test_ownership.py::test_overlay_external_edits_are_ignored_but_marker_corruption_blocks",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-07",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/reconcile/test_repair_apply.py::test_restorative_repair_uses_observed_drift_as_cas_preimage",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-08",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/reconcile/test_apply_killpoints.py::test_every_apply_killpoint_has_one_recognizable_commit_state",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-09",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/reconcile/test_recovery.py::test_committed_transaction_allows_cleanup_only",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-10",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/reconcile/test_locks.py::test_project_locks_serialize_two_processes",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-11",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/contracts/runtime/test_integration.py::test_lifecycle_revision_blocked_and_claim_invariants_are_closed",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-12",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/core/test_task_policy.py::test_upgrade_blocks_heavy_and_only_affected_native_tasks",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-13",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/core/test_catalog.py::test_dependency_and_reference_closure_has_stable_topological_order",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-14",
+      "primary_owner": "Task 6",
+      "scenario_group": "distribution",
+      "primary_node": "tests/packaging/test_distribution_render_digest.py::test_distribution_render_digest_matches_git_wheel_and_sdist",
+      "supporting_nodes": [
+        "tests/e2e/test_distribution_sequence.py::test_git_wheel_and_sdist_execute_identical_render_and_cli_flow"
+      ]
+    },
+    {
+      "ac_id": "AC-15",
+      "primary_owner": "Task 2",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/providers/test_initializer.py::test_initializer_runs_with_clean_environment_and_validated_output",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-16",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/contracts/cli/test_json_output.py::test_error_output_preserves_imported_code_and_exit_category",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-17",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/reconcile/test_ownership.py::test_adopted_create_once_and_user_owned_never_gain_overwrite_authority",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-18",
+      "primary_owner": "Task 6",
+      "scenario_group": "distribution",
+      "primary_node": "tests/packaging/test_package_data.py::test_wheel_contains_all_frozen_runtime_and_release_data",
+      "supporting_nodes": [
+        "tests/e2e/test_distribution_sequence.py::test_git_wheel_and_sdist_execute_identical_render_and_cli_flow"
+      ]
+    },
+    {
+      "ac_id": "AC-19",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/reconcile/test_cas.py::test_compare_and_swap_rejects_every_changed_precondition",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-20",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/reconcile/test_probes.py::test_probe_refuses_symlink_target_root",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-21",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/runtime/test_task_killpoints.py::test_every_admission_killpoint_resumes_to_one_active_task",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-22",
+      "primary_owner": "Task 5",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/route/test_wrappers.py::test_heavy_mode_can_dispatch_only_the_heavy_development_router",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-23",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_workspace_register.py::test_registration_commits_workspace_and_empty_replay_as_one_pair",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-24",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/e2e/runtime/test_launcher_bootstrap.py::test_uv_cache_miss_or_hash_failure_is_propagated_without_project_write",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-25",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_task_admission.py::test_admission_commits_only_after_metadata_and_consumes_proof",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-26",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/reconcile/test_apply.py::test_true_noop_still_revalidates_the_complete_saved_plan",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-27",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/core/test_task_policy.py::test_workspace_migration_returns_every_blocker_in_policy_order",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-28",
+      "primary_owner": "Task 2",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/property/providers/test_deterministic_output.py::test_independent_clean_roots_produce_the_same_validated_digest",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-29",
+      "primary_owner": "Task 6",
+      "scenario_group": "distribution",
+      "primary_node": "tests/contracts/release/test_provenance_inventory.py::test_inventory_contains_no_distribution_container_hash_cycle",
+      "supporting_nodes": [
+        "tests/e2e/test_distribution_sequence.py::test_git_wheel_and_sdist_execute_identical_render_and_cli_flow"
+      ]
+    },
+    {
+      "ac_id": "AC-30",
+      "primary_owner": "Task 5",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/route/test_calculator.py::test_closed_operation_route_pairs_and_intent_only_executable_signals",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-31",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_task_archive.py::test_archive_commit_is_archived_integration_after_move_and_metadata",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-32",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/runtime/test_replay.py::test_first_reservation_requires_ttl_but_same_transaction_recovery_can_resume",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-33",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/property/core/test_trellis_layout.py::test_metadata_cannot_overlap_source_artifact_or_control_plane_paths",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-34",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/core/test_saved_plan.py::test_all_four_saved_plan_operation_branches_are_closed",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-35",
+      "primary_owner": "Task 6",
+      "scenario_group": "distribution",
+      "primary_node": "tests/unit/reconcile/test_render.py::test_release_substitutions_are_excluded_only_from_launcher_bundle_digest",
+      "supporting_nodes": [
+        "tests/e2e/test_distribution_sequence.py::test_git_wheel_and_sdist_execute_identical_render_and_cli_flow"
+      ]
+    },
+    {
+      "ac_id": "AC-36",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_mixed_launcher_descriptor.py::test_recorded_launcher_descriptor_preimage_candidate_mixes_are_recoverable",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-37",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/contracts/reconcile/test_maintenance_binding.py::test_maintenance_binds_immutable_header_not_mutable_journal_phase",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-38",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/runtime/test_workspace_migrate_killpoints.py::test_every_workspace_migration_killpoint_resumes_to_target_contract",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-39",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/runtime/test_task_killpoints.py::test_admission_rollback_after_journal_before_reservation_writes_consumed_tombstone",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-40",
+      "primary_owner": "Task 2",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/providers/test_attempt_journal.py::test_two_attempts_for_one_plan_cannot_overlap",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-41",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/property/core/test_digest_dag.py::test_plan_core_changes_flow_forward_without_a_reverse_digest_edge",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-42",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-b",
+      "primary_node": "tests/integration/runtime/test_workspace_migrate.py::test_workspace_migration_commits_local_state_only_and_binds_evaluators",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_b_workspace_migration.py::test_clone_b_executes_continuous_pull_gate_and_migration_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-43",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/runtime/test_caller_context.py::test_verified_context_requires_authority_before_any_external_probe",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-44",
+      "primary_owner": "Task 2",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/providers/test_attempts.py::test_prepared_without_receipt_can_recover_to_interrupted",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-45",
+      "primary_owner": "Task 2",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/providers/test_approval.py::test_direct_human_provider_approval_binds_the_complete_plan",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-46",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-b",
+      "primary_node": "tests/e2e/test_clone_b_workspace_migration.py::test_scanner_scope_is_checkout_local",
+      "supporting_nodes": [
+        "tests/unit/core/test_task_policy.py::test_workspace_diagnostic_separates_state_from_command_admission",
+        "tests/e2e/test_clone_b_workspace_migration.py::test_clone_b_executes_continuous_pull_gate_and_migration_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-47",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-b",
+      "primary_node": "tests/integration/runtime/test_mixed_launcher_descriptor.py::test_old_task_journal_after_pull_cannot_authorize_old_runtime",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_b_workspace_migration.py::test_clone_b_executes_continuous_pull_gate_and_migration_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-48",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-b",
+      "primary_node": "tests/integration/runtime/test_workspace_migrate.py::test_unsupported_discovery_and_strict_task_findings_block",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_b_workspace_migration.py::test_clone_b_executes_continuous_pull_gate_and_migration_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-49",
+      "primary_owner": "Task 2",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/concurrency/providers/test_broker_killpoints.py::test_sigkill_boundaries_leave_recoverable_durable_evidence",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-50",
+      "primary_owner": "Task 6",
+      "scenario_group": "distribution",
+      "primary_node": "tests/e2e/runtime/test_launcher_bootstrap.py::test_launcher_cleans_environment_and_executes_exact_direct_wheel",
+      "supporting_nodes": [
+        "tests/e2e/test_distribution_sequence.py::test_git_wheel_and_sdist_execute_identical_render_and_cli_flow"
+      ]
+    },
+    {
+      "ac_id": "AC-51",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-c",
+      "primary_node": "tests/unit/release/test_compatibility.py::test_reverse_only_is_ahead_and_no_direction_is_diverged",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_c_relationship_diagnostics.py::test_clone_c_executes_continuous_relationship_diagnostic_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-52",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-b",
+      "primary_node": "tests/unit/runtime/test_scanner.py::test_source_target_union_reports_one_sided_task_state",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_b_workspace_migration.py::test_clone_b_executes_continuous_pull_gate_and_migration_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-53",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/property/runtime/test_scanner_bounds.py::test_task_and_root_count_limits_fail_closed_without_quiescent_truncation",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-54",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-b",
+      "primary_node": "tests/integration/runtime/test_workspace_migrate.py::test_source_only_archive_is_stranded_when_target_layout_changes",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_b_workspace_migration.py::test_clone_b_executes_continuous_pull_gate_and_migration_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-55",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_reconciler_scanner_binding.py::test_normative_scanner_exactly_satisfies_renderer_port",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-56",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-b",
+      "primary_node": "tests/integration/runtime/test_workspace_migrate.py::test_external_task_change_before_workspace_commit_is_unconditional_stale_error",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_b_workspace_migration.py::test_clone_b_executes_continuous_pull_gate_and_migration_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-57",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-c",
+      "primary_node": "tests/unit/core/test_task_policy.py::test_workspace_diagnostic_separates_state_from_command_admission",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_c_relationship_diagnostics.py::test_clone_c_executes_continuous_relationship_diagnostic_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-58",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_task_admission.py::test_verifier_failure_and_duplicate_identity_fail_before_mutation",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-59",
+      "primary_owner": "Task 5",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/route/test_surface_closure.py::test_calculator_and_admission_recomputation_use_identical_surface_digest",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-60",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-c",
+      "primary_node": "tests/integration/release/test_source_static_metadata.py::test_invalid_authenticated_static_schema_is_supply_chain_failure",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_c_relationship_diagnostics.py::test_clone_c_executes_continuous_relationship_diagnostic_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-61",
+      "primary_owner": "Task 4",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_runtime_load.py::test_request_has_no_create_decision_and_dispatch_is_an_immutable_in_memory_bundle",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-62",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/unit/core/test_surfaces.py::test_omitted_leaf_fields_and_distribution_mismatch_fail_coverage",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-63",
+      "primary_owner": "Task 3",
+      "scenario_group": "clone-a",
+      "primary_node": "tests/integration/runtime/test_runtime_load.py::test_restorative_repair_to_the_same_pinned_contract_allows_resume",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_a_lifecycle.py::test_clone_a_executes_continuous_recovery_and_upgrade_sequence"
+      ]
+    },
+    {
+      "ac_id": "AC-64",
+      "primary_owner": "Task 1",
+      "scenario_group": "clone-c",
+      "primary_node": "tests/property/core/test_workspace_diagnostics.py::test_requested_command_never_changes_fixed_workspace_quiescence",
+      "supporting_nodes": [
+        "tests/e2e/test_clone_c_relationship_diagnostics.py::test_clone_c_executes_continuous_relationship_diagnostic_sequence"
+      ]
+    }
+  ]
+}

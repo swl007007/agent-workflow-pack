@@ -20,6 +20,21 @@ def step_runs(job: dict[str, object]) -> list[str]:
     return [str(step.get("run", "")) for step in steps if isinstance(step, dict)]
 
 
+def complete_acceptance_command(commands: list[str]) -> str:
+    return next(
+        command
+        for command in commands
+        if "tests/unit" in command
+        and "tests/contracts" in command
+        and "tests/property" in command
+        and "tests/golden" in command
+        and "tests/integration" in command
+        and "tests/concurrency" in command
+        and "tests/packaging" in command
+        and "tests/e2e" in command
+    )
+
+
 def test_ci_matrix_covers_python_311_through_314_and_artifact_gates() -> None:
     workflow = load_workflow("ci.yml")
     jobs = workflow["jobs"]
@@ -37,7 +52,7 @@ def test_ci_matrix_covers_python_311_through_314_and_artifact_gates() -> None:
         i for i, value in enumerate(commands) if "build_artifacts.py" in value
     )
     assert any("sync_runtime_vendor.py --check" in value for value in commands)
-    assert any("tests/packaging" in value and "tests/integration/release" in value for value in commands)
+    assert complete_acceptance_command(commands)
 
 
 def test_release_workflow_orders_build_gate_manifest_publish_and_reverify() -> None:
@@ -52,6 +67,11 @@ def test_release_workflow_orders_build_gate_manifest_publish_and_reverify() -> N
     publish_commands = step_runs(publish)
 
     assert any("build_artifacts.py" in value for value in build_commands)
+    acceptance_index = build_commands.index(complete_acceptance_command(build_commands))
+    build_index = next(
+        i for i, value in enumerate(build_commands) if "build_artifacts.py" in value
+    )
+    assert build_index < acceptance_index
     assert not any("release-manifest.json" in value for value in build_commands)
     assert not any("uv build" in value for value in publish_commands)
     verify_index = next(

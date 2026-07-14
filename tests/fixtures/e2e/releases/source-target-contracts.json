@@ -1,0 +1,9 @@
+{
+  "schema_id": "agent-workflow.e2e-source-target-contracts",
+  "schema_version": 1,
+  "source_release_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "target_release_id": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "relationship": "migration-required",
+  "retained_runtime_resume": false,
+  "migration_scope": "ignored-local-state-only"
+}

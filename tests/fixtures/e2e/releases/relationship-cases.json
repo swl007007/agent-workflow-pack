@@ -1,0 +1,30 @@
+{
+  "schema_id": "agent-workflow.e2e-relationship-cases",
+  "schema_version": 1,
+  "cases": [
+    {
+      "case_id": "ahead",
+      "relationship": "ahead",
+      "discovery_evidence": "unsupported",
+      "primary_state_blocker": "AWP_WORKSPACE_CONTRACT_AHEAD"
+    },
+    {
+      "case_id": "diverged",
+      "relationship": "diverged",
+      "discovery_evidence": "unsupported",
+      "primary_state_blocker": "AWP_WORKSPACE_CONTRACT_DIVERGED"
+    },
+    {
+      "case_id": "missing",
+      "relationship": "unknown",
+      "discovery_evidence": "missing",
+      "primary_state_blocker": "AWP_WORKSPACE_SOURCE_METADATA_REQUIRED"
+    },
+    {
+      "case_id": "invalid",
+      "relationship": "unknown",
+      "discovery_evidence": "verified",
+      "primary_state_blocker": "AWP_SOURCE_RELEASE_VERIFICATION_FAILED"
+    }
+  ]
+}

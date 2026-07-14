@@ -21,6 +21,8 @@ jobs:
       - run: uv run python tools/vendor/sync_runtime_vendor.py --check
       - run: uv run python tools/release/generate_notices.py --check
       - run: uv run python tools/release/build_artifacts.py
-      - run: uv run pytest tests/packaging tests/integration/release tests/contracts/release -q
+      - run: >-
+          uv run pytest tests/unit tests/contracts tests/property tests/golden
+          tests/integration tests/concurrency tests/packaging tests/e2e -q
       - run: uv run ruff check src tests tools
       - run: uv run mypy src
