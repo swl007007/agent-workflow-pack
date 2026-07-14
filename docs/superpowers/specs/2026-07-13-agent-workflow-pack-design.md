@@ -1,7 +1,7 @@
 # Agent Workflow Pack v0.1 Design
 
-**Status:** Changes required
-**Review gate:** Incremental protocol errata applied; awaiting reviewer confirmation before approval or implementation decomposition
+**Status:** Approved
+**Review gate:** Unconditional design approval confirmed; feature-spec decomposition is permitted, while production implementation remains gated by approved feature specs and implementation plans
 **Date:** 2026-07-13  
 **Target:** New sibling repository `agent-workflow-pack`  
 **Initial profile:** `sol56-sdd`  
@@ -2116,7 +2116,7 @@ The current custom skills are migration inputs, not automatically valid release 
 
 ## 31. Deferred Implementation Decomposition
 
-Only after unconditional design approval may separate feature specs be created in this order:
+Unconditional design approval is confirmed. Separate feature specs must now be created and approved in this order before their production implementation begins:
 
 1. **Core schemas and Resolver** — profiles, catalog, locks, canonicalization, artifact definitions, runtime-surface registry/inventory/full-coverage proof, authority/surface/repair impact, fixed workspace-state and command-gate evaluators, acyclic saved-plan digest envelope, local-state schemas, IR, policy graph, and diagnostics.
 2. **Providers and secure cache** — acquisition, isolation, direct-human exception approval, trusted broker release handshake, whole-file attempt journals and immutable release receipts, verification, extraction limits, provenance, and cache concurrency.
@@ -2139,4 +2139,4 @@ Each feature spec must preserve the authority boundaries and acceptance criteria
 - Caller-context forwarding deliberately exposes only normalized non-sensitive paths and capability facts after release verification. Platform adapters must keep their allowlists narrow so harness inspection does not become an ambient-environment or credential channel.
 - v0.1 deliberately refuses transparent task resume across a pulled release contract. This may require users to restore an earlier checkout to finish/archive work before migration, but avoids shipping a second content-addressed runtime catalog and compatibility loader before those contracts are separately designed.
 
-The thirteenth-version architecture remains stable, but this candidate is still `Changes required` until the existing-task runtime-load admission path, runtime-surface full-coverage/authority-change model, restorative-repair semantics, and fixed command-independent workspace-state evaluator receive focused reviewer approval. Implementation planning and feature-spec decomposition remain prohibited until that confirmation.
+The thirteenth-version architecture is unconditionally approved. Section 31 feature-spec decomposition and implementation-plan drafting may begin in the specified order. Production implementation of a subsystem remains prohibited until its feature spec and implementation plan are separately approved.
