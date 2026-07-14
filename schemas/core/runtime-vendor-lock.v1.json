@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.runtime-vendor-lock",
+  "title": "Agent Workflow Pack runtime vendor lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "namespace", "components"],
+  "properties": {
+    "schema_id": {
+      "const": "agent-workflow.runtime-vendor-lock"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "namespace": {
+      "const": "agent_stack._vendor"
+    },
+    "components": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "version",
+          "source",
+          "spdx",
+          "license",
+          "install",
+          "exclusions",
+          "files"
+        ],
+        "properties": {
+          "name": {
+            "enum": ["PyYAML", "fastjsonschema"]
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["archive_name", "url", "sha256"],
+            "properties": {
+              "archive_name": {"type": "string", "minLength": 1},
+              "url": {"type": "string", "format": "uri"},
+              "sha256": {"$ref": "#/$defs/sha256"}
+            }
+          },
+          "spdx": {
+            "enum": ["MIT", "BSD-3-Clause"]
+          },
+          "license": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["upstream_path", "installed_path", "sha256"],
+            "properties": {
+              "upstream_path": {"type": "string", "minLength": 1},
+              "installed_path": {"type": "string", "minLength": 1},
+              "sha256": {"$ref": "#/$defs/sha256"}
+            }
+          },
+          "install": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["upstream_root", "target_root", "modification"],
+            "properties": {
+              "upstream_root": {"type": "string", "minLength": 1},
+              "target_root": {"type": "string", "minLength": 1},
+              "modification": {"const": "namespace-relocation-only"}
+            }
+          },
+          "exclusions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1}
+          },
+          "files": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "upstream_path",
+                "upstream_sha256",
+                "installed_path",
+                "installed_sha256"
+              ],
+              "properties": {
+                "upstream_path": {"type": "string", "minLength": 1},
+                "upstream_sha256": {"$ref": "#/$defs/sha256"},
+                "installed_path": {"type": "string", "minLength": 1},
+                "installed_sha256": {"$ref": "#/$defs/sha256"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

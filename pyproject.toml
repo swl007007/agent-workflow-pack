@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agent-workflow-pack"
+version = "0.1.0"
+description = "Self-contained workflow-pack runtime and control plane"
+requires-python = ">=3.11,<3.15"
+license = "Apache-2.0"
+
+[dependency-groups]
+dev = [
+  "build>=1.2,<2",
+  "hypothesis>=6.0,<7",
+  "mypy>=1.15,<2",
+  "pytest>=8.3,<9",
+  "ruff>=0.11,<1",
+]
+
+[tool.uv]
+default-groups = ["dev"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_stack"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = ["src/agent_stack/_vendor"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+exclude = ["^src/agent_stack/_vendor/"]

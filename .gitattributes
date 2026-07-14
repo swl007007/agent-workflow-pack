@@ -1,0 +1,3 @@
+# Exact upstream bytes are hash-locked; Git must not normalize or flag them.
+src/agent_stack/_vendor/** -text -whitespace
+vendor/licenses/** -text -whitespace
