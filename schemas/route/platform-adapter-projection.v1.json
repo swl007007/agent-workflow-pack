@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.platform-adapter-projection",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-5",
+  "x-implementation-owner": "task-5",
+  "x-digest-domains": ["agent-workflow.platform-adapter-projection.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "platform", "adapter_id", "adapter_version", "units", "wrappers", "blocked_bypass_entries", "projection_digest"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.platform-adapter-projection"},
+    "schema_version": {"const": 1},
+    "platform": {"enum": ["claude-code", "codex", "opencode"]},
+    "adapter_id": {"type": "string", "minLength": 1},
+    "adapter_version": {"type": "string", "minLength": 1},
+    "units": {"type": "array", "items": {"type": "object"}},
+    "wrappers": {"type": "array", "items": {"type": "object"}},
+    "blocked_bypass_entries": {"type": "array", "items": {"type": "string"}},
+    "projection_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.adapter-golden-contract",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-5",
+  "x-implementation-owner": "task-5",
+  "x-digest-domains": ["agent-workflow.adapter-golden-contract.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "golden_contract_id", "platform", "adapter_version", "fixture_digest", "expected_paths", "expected_capabilities"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.adapter-golden-contract"},
+    "schema_version": {"const": 1},
+    "golden_contract_id": {"type": "string", "minLength": 1},
+    "platform": {"enum": ["claude-code", "codex", "opencode"]},
+    "adapter_version": {"type": "string", "minLength": 1},
+    "fixture_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "expected_paths": {"type": "array", "items": {"type": "string"}},
+    "expected_capabilities": {"type": "object"}
+  }
+}

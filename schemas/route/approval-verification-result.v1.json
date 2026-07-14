@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.approval-verification-result",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-5",
+  "x-implementation-owner": "task-5",
+  "x-digest-domains": ["agent-workflow.approval-verification-result.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "operation", "approval_id", "verifier_id", "verifier_version", "actor_id", "mechanism", "validated_at", "proof_expires_at", "verification_digest"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.approval-verification-result"},
+    "schema_version": {"const": 1},
+    "operation": {"const": "create-integrated-task"},
+    "approval_id": {"$ref": "#/$defs/uuid"},
+    "verifier_id": {"type": "string", "minLength": 1},
+    "verifier_version": {"type": "string", "minLength": 1},
+    "actor_id": {"type": "string", "minLength": 1},
+    "mechanism": {"type": "string", "minLength": 1},
+    "validated_at": {"type": "string", "format": "date-time"},
+    "proof_expires_at": {"type": "string", "format": "date-time"},
+    "verification_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  },
+  "$defs": {"uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}}
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.route-failure",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-5",
+  "x-implementation-owner": "task-5",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "code", "exit_code", "message", "details"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.route-failure"},
+    "schema_version": {"const": 1},
+    "code": {"type": "string", "pattern": "^AWP_[A-Z0-9_]+$"},
+    "exit_code": {"type": "integer"},
+    "message": {"type": "string"},
+    "details": {"type": "object"}
+  }
+}
