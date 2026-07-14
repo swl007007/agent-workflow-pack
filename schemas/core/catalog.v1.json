@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.catalog",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "entries"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.catalog"},
+    "schema_version": {"const": 1},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "dependencies",
+          "conflicts",
+          "references",
+          "platforms",
+          "required_capabilities",
+          "mandatory",
+          "discoverable"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9._-]*$"},
+          "kind": {"type": "string", "pattern": "^[a-z][a-z0-9-]*$"},
+          "dependencies": {"type": "array", "items": {"type": "string"}},
+          "conflicts": {"type": "array", "items": {"type": "string"}},
+          "references": {"type": "array", "items": {"type": "string"}},
+          "platforms": {"type": "array", "items": {"type": "string"}},
+          "required_capabilities": {
+            "type": "object",
+            "additionalProperties": {"enum": ["unsupported", "instruction-only", "enforced"]}
+          },
+          "mandatory": {"type": "boolean"},
+          "discoverable": {"type": "boolean"}
+        }
+      }
+    }
+  }
+}

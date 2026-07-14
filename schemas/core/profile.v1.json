@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.profile",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-1",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "id"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.profile"},
+    "schema_version": {"const": 1},
+    "id": {"type": "string", "minLength": 1},
+    "extends": {"type": "string", "minLength": 1},
+    "route_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "default_route": {"enum": ["native-light", "trellis-native", "speckit-superpowers"]},
+        "light_owner": {"type": "string", "minLength": 1},
+        "heavy_owner": {"type": "string", "minLength": 1},
+        "explicit_only": {"type": "boolean"}
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {"type": "string", "minLength": 1}
+      }
+    },
+    "skills": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enable": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "disable": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "artifact_policy": {"type": "string", "minLength": 1},
+    "default_platforms": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "required_capabilities": {
+      "type": "object",
+      "additionalProperties": {"enum": ["unsupported", "instruction-only", "enforced"]}
+    },
+    "approval_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_creation": {"enum": ["required", "disabled"]},
+        "provider_execution": {"enum": ["required", "approval-required", "best-effort"]}
+      }
+    },
+    "provider_security_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initializer": {"enum": ["required", "approval-required", "best-effort"]}
+      }
+    }
+  }
+}

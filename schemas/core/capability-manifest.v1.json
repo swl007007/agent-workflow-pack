@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-workflow.capability-manifest",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-1",
+  "x-implementation-owner": "task-5",
+  "x-digest-domains": [],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "platform",
+    "adapter_id",
+    "adapter_version",
+    "harness_id",
+    "harness_version",
+    "probe_suite_id",
+    "probe_suite_version",
+    "capabilities",
+    "approval_verifiers",
+    "evidence_digest"
+  ],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.capability-manifest"},
+    "schema_version": {"const": 1},
+    "platform": {"type": "string", "minLength": 1},
+    "adapter_id": {"type": "string", "minLength": 1},
+    "adapter_version": {"type": "string", "minLength": 1},
+    "harness_id": {"type": "string", "minLength": 1},
+    "harness_version": {"type": "string", "minLength": 1},
+    "probe_suite_id": {"type": "string", "minLength": 1},
+    "probe_suite_version": {"type": "integer", "minimum": 1},
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": {"enum": ["unsupported", "instruction-only", "enforced"]}
+    },
+    "approval_verifiers": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_creation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["verifier_id", "verifier_version", "actor_source", "receipt_source"],
+          "properties": {
+            "verifier_id": {"type": "string", "minLength": 1},
+            "verifier_version": {"type": "string", "minLength": 1},
+            "actor_source": {"const": "direct-human"},
+            "receipt_source": {"type": "string", "minLength": 1}
+          }
+        }
+      }
+    },
+    "evidence_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}
