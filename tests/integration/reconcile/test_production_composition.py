@@ -4,6 +4,7 @@ from pathlib import Path
 import shutil
 import json
 import subprocess
+from collections.abc import Mapping
 from types import MappingProxyType
 
 from agent_stack.cli.parser import CommandInvocation
@@ -14,6 +15,8 @@ from agent_stack.reconcile.production_bundle import load_production_bundle
 from agent_stack.release.identity import ReleaseIdentity
 from agent_stack.release.manifest import VerifiedRelease
 from agent_stack.runtime import commands as runtime_commands
+from agent_stack.runtime.task_service import admit_task
+from tests.integration.runtime.test_task_admission import admission_request, initialize_project
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -62,7 +65,13 @@ def _command(
     )
 
 
-def _launcher_command(root: Path, caller_root: Path) -> ProductionCommand:
+def _launcher_command(
+    root: Path,
+    caller_root: Path,
+    *,
+    command: str = "workspace-register",
+    options: Mapping[str, object] | None = None,
+) -> ProductionCommand:
     home = caller_root / "home"
     config = home / ".codex"
     harness = home / "bin/codex"
@@ -72,8 +81,8 @@ def _launcher_command(root: Path, caller_root: Path) -> ProductionCommand:
     harness.chmod(0o755)
     return ProductionCommand(
         invocation=CommandInvocation(
-            command="workspace-register",
-            options=MappingProxyType({}),
+            command=command,
+            options=options or MappingProxyType({}),
             json_output=True,
             debug=False,
         ),
@@ -252,3 +261,79 @@ def test_production_workspace_register_recreates_clone_local_contract(
     assert result["committed"] is True
     assert (local / "workspace.json").is_file()
     assert (local / "approval-replay.json").is_file()
+
+
+def test_production_task_claim_loads_real_integration_and_calls_domain_service(
+    tmp_path: Path, monkeypatch
+) -> None:
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    commands.run_init(_command(project, dry_run=False))
+
+    task_source = tmp_path / "task-source"
+    initialize_project(task_source)
+    admitted = admit_task(admission_request(task_source, route="speckit-superpowers"))
+    source = task_source / admitted.task_ref
+    target = project / admitted.task_ref
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source, target)
+    manifest = json.loads(
+        (project / ".agent-workflow/manifest.json").read_text(encoding="utf-8")
+    )
+    release = _verified_release()
+    registered_release = VerifiedRelease(
+        identity=release.identity,
+        manifest_digest=release.manifest_digest,
+        source_commit=release.source_commit,
+        bundles={
+            **dict(release.bundles),
+            "artifact": manifest["artifact_bundle_digest"],
+            "workflow_lock": manifest["lock_digest"],
+            "trust_policy": manifest["release_trust_policy_digest"],
+        },
+        assets=release.assets,
+        immutable_release=True,
+    )
+    monkeypatch.setattr(
+        runtime_commands, "_authorize_running_release", lambda: registered_release
+    )
+    monkeypatch.setattr(runtime_commands, "_data_root", lambda: data_root)
+    command = _launcher_command(
+        project,
+        tmp_path / "caller-claim",
+        command="task-claim",
+        options=MappingProxyType(
+            {
+                "task_ref": admitted.task_ref,
+                "revision": admitted.state_revision,
+                "executor": "speckit-implement",
+            }
+        ),
+    )
+
+    result = runtime_commands.run_task_claim(command)
+
+    assert result["state_revision"] == admitted.state_revision + 1
+    assert result["executor_claim"]["executor"] == "speckit-implement"
+
+    released = runtime_commands.run_task_release(
+        _launcher_command(
+            project,
+            tmp_path / "caller-release",
+            command="task-release",
+            options=MappingProxyType(
+                {
+                    "task_ref": admitted.task_ref,
+                    "revision": result["state_revision"],
+                    "executor": "speckit-implement",
+                }
+            ),
+        )
+    )
+
+    assert released["state_revision"] == result["state_revision"] + 1
+    assert released["executor_claim"] is None

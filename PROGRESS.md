@@ -19,6 +19,7 @@
 - All lazy owner targets are now distinct importable functions; Runtime functions still require real state-loader/domain-service binding before closure.
 - Verified launcher caller fields reach `ProductionCommand`; doctor now performs real read-only project authority reconstruction in the current increment.
 - Production `workspace register` now verifies committed runtime authority and launcher caller context, loads the packaged Trellis layout, and commits the real workspace/replay pair for a fresh clone.
+- Production heavy-task claim/release now load canonical integration state, verify project/caller authority, and call the real Task-state Service with generated transaction identities.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
@@ -36,4 +37,4 @@
 
 ## Resume
 
-Add workspace-migration/recovery RED over verified committed project state, bind its real state loaders/domain service, then continue task/recovery/lifecycle owners.
+Add production task transition/recovery RED over canonical integration/journal state, then bind runtime-load/admission/archive before returning to workspace/lifecycle migration and recovery.
