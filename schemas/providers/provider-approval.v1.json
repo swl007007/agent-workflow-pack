@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "agent-workflow.provider-approval",
+  "x-schema-version": 1,
+  "x-definition-owner": "task-2",
+  "x-implementation-owner": "task-2",
+  "x-digest-domains": ["agent-workflow.provider-approval.v1"],
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "schema_version", "approval_id", "verifier_id", "verifier_version", "platform", "harness_version", "actor", "issued_at", "expires_at", "workspace_instance_id", "operation", "provider_plan_digest", "risk_report_digest", "prospective_transaction_id", "approval_challenge", "verifier_receipt"],
+  "properties": {
+    "schema_id": {"const": "agent-workflow.provider-approval"},
+    "schema_version": {"const": 1},
+    "approval_id": {"$ref": "#/definitions/uuid"},
+    "verifier_id": {"type": "string", "minLength": 1},
+    "verifier_version": {"type": "string", "minLength": 1},
+    "platform": {"type": "string", "minLength": 1},
+    "harness_version": {"type": "string", "minLength": 1},
+    "actor": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "kind"],
+      "properties": {"id": {"type": "string", "minLength": 1}, "kind": {"const": "direct-human"}}
+    },
+    "issued_at": {"type": "string", "pattern": "Z$"},
+    "expires_at": {"type": "string", "pattern": "Z$"},
+    "workspace_instance_id": {"$ref": "#/definitions/uuid"},
+    "operation": {"const": "approve-provider-execution"},
+    "provider_plan_digest": {"$ref": "#/definitions/sha256"},
+    "risk_report_digest": {"$ref": "#/definitions/sha256"},
+    "prospective_transaction_id": {"$ref": "#/definitions/uuid"},
+    "approval_challenge": {"$ref": "#/definitions/sha256"},
+    "verifier_receipt": {"type": "string", "minLength": 1}
+  },
+  "definitions": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "uuid": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"}
+  }
+}
