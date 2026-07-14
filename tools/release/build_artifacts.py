@@ -33,7 +33,16 @@ def main() -> int:
     try:
         result = run_release_gates(artifact_set)
     except LifecycleFailure as error:
-        print(json.dumps(error.to_document(), sort_keys=True), file=sys.stderr)
+        print(
+            json.dumps(
+                {
+                    "failure": error.to_document(),
+                    "actual_artifact_set": artifact_set.to_document(),
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
         raise
     print(json.dumps(result, sort_keys=True, separators=(",", ":")))
     return 0
