@@ -11,12 +11,13 @@
 - Atomic first-init Manifest/workspace/replay transaction: commit `1b4193b`.
 - Packaged Trellis layout/discovery schemas and real scanner binding: commit `ed3dd3a`.
 - Complete release authority preserved across Core Resolver: commit `85f5cb1`.
+- Real packaged-bundle init composition and safe first overlay insertion: commit `c94fdda` plus the current production-init increment.
 - Focused first-init/recovery verification: 29 tests passed; Ruff and `git diff --check` passed.
 - Component-only release gates require absent production-integration evidence and therefore remain closed.
 
 ## In Progress
 
-- Compose production init/sync through the real Resolver, Renderer, Reconciler, scanner, and packaged resources.
+- Extend the completed production init path with managed launcher/runtime-control/workflow-lock artifacts, then implement strict no-op sync.
 
 ## Remaining
 
@@ -28,4 +29,4 @@
 
 ## Resume
 
-Extend `tests/integration/reconcile/test_production_composition.py` with a RED init-apply case over a temporary Git project. Implement the production two-pass Resolver/render-unit composition, observe real target states, call `plan_reconcile`, and commit through `apply_plan` without injected runtime context.
+Add RED assertions for `.agent-workflow/bin/agent-stack`, `runtime-control.json`, and the project workflow lock. Render them from `launcher_contract_from_release()` and packaged bytes, include them in ownership/Manifest authority, then use those committed contracts to implement production sync and strict second-sync no-op.
