@@ -36,6 +36,8 @@ installation command.
 - local Python `>=3.11,<3.15`;
 - Git for project identity and release operations;
 - network access to the fixed GitHub release endpoints for first installation.
+- WSL-native filesystem supported; Windows-mounted DrvFs not officially supported in
+  v0.1.x.
 
 The runtime wheel is self-contained and has no runtime `Requires-Dist` dependencies.
 
@@ -91,6 +93,8 @@ are enforced by their owning services rather than bypassed by the CLI.
 ## Documentation
 
 - [Operations manual](docs/operations-manual.md)
+- [Supported environments](docs/support-matrix.md)
+- [FAQ](docs/faq.md)
 - [Architecture specification](docs/superpowers/specs/2026-07-13-agent-workflow-pack-design.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 

@@ -228,6 +228,57 @@ def test_init_apply_uses_real_bundle_and_commits_complete_project_contract(
     } == before
 
 
+def test_init_filesystem_probe_failure_stops_once_before_launcher_and_reports_recovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import agent_stack.reconcile.apply as apply_module
+    from agent_stack.reconcile.errors import RendererFailure
+
+    data_root = _installed_data_tree(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    monkeypatch.setattr(commands, "_data_root", lambda: data_root)
+    monkeypatch.setattr(commands, "_authorize_running_release", _verified_release)
+    attempts = 0
+
+    def unsupported(root: Path, *, probe_id: str):
+        nonlocal attempts
+        attempts += 1
+        raise RendererFailure(
+            "AWP_FILESYSTEM_UNSUPPORTED",
+            "one or more live filesystem probes failed",
+            details={"posix_mode": False},
+        )
+
+    monkeypatch.setattr(apply_module, "run_write_probe", unsupported)
+
+    with pytest.raises(RendererFailure) as caught:
+        commands.run_init(_command(project, dry_run=False))
+
+    transaction_id = str(caught.value.details["transaction_id"])
+    assert attempts == 1
+    assert caught.value.code == "AWP_FILESYSTEM_UNSUPPORTED"
+    assert "Initialization stopped during filesystem probing; it is not retrying." in (
+        caught.value.message
+    )
+    assert "Start again from a clean clone under /home/<user>/..." in (
+        caught.value.message
+    )
+    assert caught.value.details["recovery_action"] == "create-clean-wsl-native-clone"
+    assert "recovery_command" not in caught.value.details
+    assert caught.value.details["retry_safe"] is False
+    assert not (project / ".agent-workflow/bin/agent-stack").exists()
+    journal = json.loads(
+        (
+            project
+            / ".agent-workflow/transactions"
+            / f"{transaction_id}.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert journal["phase"] == "probing"
+
+
 def test_production_upgrade_defaults_to_exact_running_release_no_op(
     tmp_path: Path, monkeypatch
 ) -> None:

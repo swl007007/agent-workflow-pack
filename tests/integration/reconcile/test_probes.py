@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+import agent_stack.reconcile.probes as probes_module
 from agent_stack.reconcile.errors import RendererFailure
 from agent_stack.reconcile.probes import (
     cleanup_probe_residue,
@@ -53,6 +54,25 @@ def test_probe_refuses_symlink_target_root(tmp_path: Path) -> None:
 
     with pytest.raises(RendererFailure, match="AWP_FILESYSTEM_UNSUPPORTED"):
         run_write_probe(linked)
+
+
+def test_unsupported_filesystem_error_points_to_wsl_native_storage_and_faq(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(probes_module, "_probe_advisory_lock", lambda path: False)
+
+    with pytest.raises(RendererFailure) as caught:
+        run_write_probe(tmp_path)
+
+    assert caught.value.code == "AWP_FILESYSTEM_UNSUPPORTED"
+    assert "Move the project to /home/<user>/..." in caught.value.message
+    assert "docs/faq.md" in caught.value.message
+    assert caught.value.details["recommended_action"].startswith(
+        "Move the project to /home/<user>/..."
+    )
+    assert caught.value.details["faq_url"].endswith(
+        "docs/faq.md#windows-mounted-filesystems"
+    )
 
 
 def test_probe_residue_cleanup_uses_exact_recorded_hashes(tmp_path: Path) -> None:

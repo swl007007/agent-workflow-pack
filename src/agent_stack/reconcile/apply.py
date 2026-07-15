@@ -30,12 +30,60 @@ from .manifest import apply_candidate_manifest
 from .models import FileState
 from .plan import render_candidate_manifest
 from .ports import TaskQuiescenceScannerPort
-from .probes import run_write_probe
+from .probes import FILESYSTEM_FAQ_URL, FILESYSTEM_RECOMMENDED_ACTION, run_write_probe
 from .local_state import build_first_init_local_state
 
 
 def _crash_at(point: str) -> None:
     """Test seam; production code never selects a crash point."""
+
+
+def _run_lifecycle_probe(root: Path, *, transaction_id: str, operation: str) -> None:
+    try:
+        run_write_probe(root, probe_id=transaction_id)
+    except RendererFailure as error:
+        if error.code != "AWP_FILESYSTEM_UNSUPPORTED":
+            raise
+        activity = {
+            "init": "Initialization",
+            "sync": "Synchronization",
+            "repair": "Repair",
+            "upgrade": "Upgrade",
+        }.get(operation, operation.capitalize())
+        message_parts = [
+            error.message.rstrip("."),
+            f"{activity} stopped during filesystem probing; it is not retrying",
+            "No managed project files were applied",
+        ]
+        if FILESYSTEM_RECOMMENDED_ACTION not in error.message:
+            message_parts.append(FILESYSTEM_RECOMMENDED_ACTION.rstrip("."))
+        details = {
+            **dict(error.details),
+            "transaction_id": transaction_id,
+            "operation": operation,
+            "failure_phase": "probing",
+            "retry_safe": False,
+            "recommended_action": FILESYSTEM_RECOMMENDED_ACTION,
+            "faq_url": FILESYSTEM_FAQ_URL,
+        }
+        if operation == "init":
+            message_parts.append(
+                "Start again from a clean clone under /home/<user>/... and carry over "
+                "reviewed uncommitted changes without copying .agent-workflow"
+            )
+            details["recovery_action"] = "create-clean-wsl-native-clone"
+        else:
+            recovery_command = (
+                ".agent-workflow/bin/agent-stack recover "
+                f"--transaction {transaction_id} --rollback --json"
+            )
+            message_parts.append(f"Before retrying, run `{recovery_command}`")
+            details["recovery_command"] = recovery_command
+        raise RendererFailure(
+            error.code,
+            ". ".join(message_parts) + ".",
+            details=details,
+        ) from error
 
 
 def _mapping(value: object, field: str) -> Mapping[str, object]:
@@ -389,7 +437,11 @@ def apply_plan(
         journal = advance_journal(journal, "probing")
         write_journal(root, journal)
         _crash_at("probing")
-        run_write_probe(root, probe_id=str(saved_plan.plan_core["transaction_id"]))
+        _run_lifecycle_probe(
+            root,
+            transaction_id=str(saved_plan.plan_core["transaction_id"]),
+            operation=saved_plan.operation,
+        )
 
         _prepare_backups(root, records, created_directories)
         journal = advance_journal(journal, "prepared", file_records=records)

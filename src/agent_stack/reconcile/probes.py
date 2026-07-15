@@ -21,6 +21,13 @@ from .errors import RendererFailure
 _NETWORK_FILESYSTEMS = frozenset(
     {"nfs", "nfs4", "cifs", "smb3", "fuse.sshfs", "sshfs"}
 )
+FILESYSTEM_FAQ_URL = (
+    "https://github.com/swl007007/agent-workflow-pack/"
+    "blob/main/docs/faq.md#windows-mounted-filesystems"
+)
+FILESYSTEM_RECOMMENDED_ACTION = (
+    f"Move the project to /home/<user>/... or see {FILESYSTEM_FAQ_URL}."
+)
 
 
 @dataclass(frozen=True)
@@ -37,7 +44,16 @@ class ProbeEvidence:
 
 
 def _failure(message: str, **details: object) -> RendererFailure:
-    return RendererFailure("AWP_FILESYSTEM_UNSUPPORTED", message, details=details)
+    projected_details = {
+        **details,
+        "recommended_action": FILESYSTEM_RECOMMENDED_ACTION,
+        "faq_url": FILESYSTEM_FAQ_URL,
+    }
+    return RendererFailure(
+        "AWP_FILESYSTEM_UNSUPPORTED",
+        f"{message.rstrip('.')}. {FILESYSTEM_RECOMMENDED_ACTION}",
+        details=projected_details,
+    )
 
 
 def _remove_empty_probe_directory(path: Path) -> None:

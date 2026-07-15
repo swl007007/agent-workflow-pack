@@ -35,6 +35,12 @@ python3 --version
 
 Python must satisfy `>=3.11,<3.15`. The bootstrap path must not download Python.
 
+On WSL, place mutable project checkouts in the WSL-native filesystem, for example
+`/home/<user>/projects`. Windows-mounted DrvFs paths such as `/mnt/c` and `/mnt/d` are
+not officially supported in v0.1.x. They are experimental/best-effort and may proceed
+only when the complete live filesystem probe passes. See the
+[supported environments](support-matrix.md) and [FAQ](faq.md).
+
 The canonical release command uses an isolated `uvx` environment with the equivalent
 constraints:
 
@@ -229,6 +235,11 @@ diagnostic. Examples:
 Recovery never guesses between resume and rollback. Do not remove maintenance markers,
 journals, candidates, backups, or replay tombstones manually. Post-commit recovery is
 cleanup-only; committed state is not rolled back.
+
+If init stops with `AWP_FILESYSTEM_UNSUPPORTED` before the project launcher exists,
+start again from a clean clone under `/home/<user>/...`. Carry over reviewed uncommitted
+changes without copying `.agent-workflow`. Do not repeatedly retry the partially
+initialized checkout on the unchanged unsupported mount.
 
 ## 11. Upgrade
 
