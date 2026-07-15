@@ -10,6 +10,28 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+UNREACHABLE_PROXY = "http://127.0.0.1:9"
+
+
+def _release_unavailable_environment() -> dict[str, str]:
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"}
+    }
+    environment.update(
+        {
+            "ALL_PROXY": UNREACHABLE_PROXY,
+            "HTTP_PROXY": UNREACHABLE_PROXY,
+            "HTTPS_PROXY": UNREACHABLE_PROXY,
+            "all_proxy": UNREACHABLE_PROXY,
+            "http_proxy": UNREACHABLE_PROXY,
+            "https_proxy": UNREACHABLE_PROXY,
+            "NO_PROXY": "",
+            "no_proxy": "",
+        }
+    )
+    return environment
 
 
 def _installed_console(tmp_path: Path) -> Path:
@@ -58,16 +80,10 @@ def test_unpublished_installed_console_reaches_release_gate_without_project_writ
 ) -> None:
     project = tmp_path / "project"
     project.mkdir()
-    environment = {
-        key: value
-        for key, value in os.environ.items()
-        if key not in {"PYTHONHOME", "PYTHONPATH", "VIRTUAL_ENV"}
-    }
-
     completed = subprocess.run(
         [installed_console, *command, "--json"],
         cwd=project,
-        env=environment,
+        env=_release_unavailable_environment(),
         check=False,
         capture_output=True,
         text=True,
@@ -115,6 +131,7 @@ def test_unpublished_release_dependent_commands_fail_closed_without_writes(
     completed = subprocess.run(
         [installed_console, *command, "--json"],
         cwd=project,
+        env=_release_unavailable_environment(),
         check=False,
         capture_output=True,
         text=True,
